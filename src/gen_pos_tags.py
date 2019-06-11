@@ -18,15 +18,17 @@ def gen_pos_tags(input_file, out_file):
     with open(input_file, 'r') as f_in:
         lines = f_in.read().split('\n')
     
+    print('Start processing file: '+out_file)
     f_out = open(out_file, 'w')
     for i, line in enumerate(lines):
         new_line = remove_special_tokens(line)
-        doc = nlp(new_line)
-        tags = ''
-        for sent in doc.sentences:
-            for word in sent.words:
-                tags += word.xpos + ' '
-        f_out.write(tags+'\n')
+        if len(new_line) > 0:
+            doc = nlp(new_line)
+            tags = ''
+            for sent in doc.sentences:
+                for word in sent.words:
+                    tags += word.xpos + ' '
+            f_out.write(tags+'\n')
         if i % 1000 == 0:
             print('Number of sentences proprcessed:', i)
     f_out.close()

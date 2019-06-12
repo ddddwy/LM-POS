@@ -1,7 +1,6 @@
 import os
 import torch
 import dill
-import gzip
 
 class convertvocab(object):
     def __init__(self, load_from, save_to):
@@ -88,7 +87,7 @@ class SentenceCorpus(object):
         for i, line in enumerate(lines):
             if line.strip() != "":
                 tags = line.strip().split()
-                for j, tag in enumerate(tags):
+                for j, tag in enumerate(tags[:self.seq_len]):
                     tag_ids[i, j] = self.dictionary.tag2idx[tag]
         return tag_ids
 
@@ -102,7 +101,7 @@ class SentenceCorpus(object):
         for i, line in enumerate(lines):
             if line.strip() != "":
                 tags = line.strip().split()
-                for j, tag in enumerate(tags):
+                for j, tag in enumerate(tags[:self.seq_len]):
                     if tag not in self.dictionary.tag2idx:
                         tag_ids[i, j] = self.dictionary.add_tag["<UNK>"]
                     else:
@@ -149,7 +148,7 @@ class SentenceCorpus(object):
             if line.strip() == "":
                 continue
             words = line.strip().split()
-            for j, word in enumerate(words):
+            for j, word in enumerate(words[:self.seq_len]):
                 ids[i, j] = self.dictionary.word2idx[word]
         return ids
 
@@ -164,7 +163,7 @@ class SentenceCorpus(object):
             if line.strip() == "":
                 continue
             words = line.strip().split()
-            for j, word in enumerate(words):
+            for j, word in enumerate(words[:self.seq_len]):
                 if word not in self.dictionary.word2idx:
                     ids[i, j] = self.dictionary.add_word("<unk>")
                 else:
@@ -190,6 +189,5 @@ class SentenceCorpus(object):
                     ids[j] = self.dictionary.add_word("<unk>")
                 else:
                     ids[j] = self.dictionary.word2idx[word]
-                token += 1
             all_ids.append(ids)                
         return (sents, all_ids)

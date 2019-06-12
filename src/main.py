@@ -47,7 +47,7 @@ parser.add_argument('--dropout', type=float, default=0.2,
                     help='dropout applied to layers (0 = no dropout)')
 parser.add_argument('--seed', type=int, default=1234,
                     help='random seed')
-parser.add_argument('--cuda', action='store_true', default=True,
+parser.add_argument('--cuda', action='store_true',
                     help='use CUDA')
 parser.add_argument('--log-interval', type=int, default=200, metavar='N',
                     help='report interval')
@@ -253,7 +253,7 @@ def test_get_batch(sent_ids, tag_ids, evaluation=False):
         return input_token, output_token, input_tag
     
 def get_batch(lm_data, tag_data, i, evaluation=False):
-    seq_len = min(args.bptt, len(lm_data))
+    seq_len = min(args.bptt, lm_data.size(0))
     input_token = Variable(lm_data[:seq_len-1, i*args.batch_size:(i+1)*args.batch_size], volatile=evaluation)
     output_token = Variable(lm_data[1:seq_len, i*args.batch_size:(i+1)*args.batch_size])
     input_tag = Variable(tag_data[:seq_len-1, i*args.batch_size:(i+1)*args.batch_size], volatile=evaluation)
@@ -345,6 +345,8 @@ def train(train_lm_data, train_ccg_data):
     order = list(enumerate(range(train_lm_data.size(1))))
     random.shuffle(order)
     for batch, i in order:
+        if (i+1)*args.batch_size > train_lm_data.size(1):
+            continue
         input_tokens, output_tokens, input_tag = get_batch(train_lm_data, train_ccg_data, i)
             
         # Starting each batch, we detach the hidden state from how it was previously produced.
@@ -352,26 +354,25 @@ def train(train_lm_data, train_ccg_data):
         hidden = repackage_hidden(hidden)
         model.zero_grad()
         output, hidden = model(input_tokens, hidden) # output = [seq_len, batch_size, ntoken]
-        batch_loss = []
+        batch_loss = 0
         for bid in range(args.batch_size):  
             loss = criterion(output[:, bid, :], output_tokens[:, bid])  # [seq_len]
-            batch_loss.append(loss)
-        sum_batch_loss = torch.sum(torch.stack(batch_loss, 1))
-        sum_batch_loss.backward()
+            batch_loss += loss
+        batch_loss.backward()
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
         for p in model.parameters():
             p.data.add_(-lr, p.grad.data)
 
-        total_loss += sum_batch_loss.item()
+        total_loss += batch_loss.item()
 
         if batch % args.log_interval == 0 and batch > 0:
             cur_loss = total_loss / args.log_interval
             elapsed = time.time() - start_time
             print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | {:5.2f} ms/batch | '
                     'loss {:5.2f} | ppl {:8.2f}'.format(
-                epoch, batch, len(train_lm_data)+len(train_ccg_data) // args.bptt, lr,
+                epoch, batch, train_lm_data.size(1) // args.bptt, lr,
                 elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
             total_loss = 0
             start_time = time.time()

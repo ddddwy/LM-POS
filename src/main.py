@@ -104,7 +104,7 @@ corpus = data.SentenceCorpus(args.bptt, args.lm_data, args.tag_data,
                              trainfname=args.trainfname,
                              validfname=args.validfname,
                              testfname=args.testfname,
-                             args.save_lm_data, args.test)
+                             save_to=args.save_lm_data, testflag=args.test)
 
 if args.test:
     test_lm_sentences, test_lm_data = corpus.test_lm

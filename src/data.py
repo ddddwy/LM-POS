@@ -56,7 +56,7 @@ class SentenceCorpus(object):
                 tag_ids[i, 0] = self.tag2idx['<SOS>']
                 for j, tag in enumerate(tags[:self.seq_len-1]):
                     if tag not in self.tag2idx:
-                        tag_ids[i, j+1] = self.add_tag["<UNK>"]
+                        tag_ids[i, j+1] = self.tag2idx["<UNK>"]
                     else:
                         tag_ids[i, j+1] = self.tag2idx[tag]
                 if j+1 < self.seq_len-1:
@@ -79,7 +79,7 @@ class SentenceCorpus(object):
                 tag_ids[0] = self.tag2idx['<SOS>']
                 for j, tag in enumerate(tags):
                     if tag not in self.tag2idx:
-                        tag_ids[j+1] = self.add_tag["<UNK>"]
+                        tag_ids[j+1] = self.tag2idx["<UNK>"]
                     else:
                         tag_ids[j+1] = self.tag2idx[tag]
                 tag_ids[j+2] = self.tag2idx['<EOS>']
@@ -124,7 +124,7 @@ class SentenceCorpus(object):
             ids[i, 0] = self.word2idx['<sos>']
             for j, word in enumerate(words[:self.seq_len-1]):
                 if word not in self.word2idx:
-                    ids[i, j+1] = self.add_word("<unk>")
+                    ids[i, j+1] = self.word2idx("<unk>")
                 else:
                     ids[i, j+1] = self.word2idx[word]
             if j+1 < self.seq_len-1:
@@ -149,7 +149,7 @@ class SentenceCorpus(object):
             ids[0] = self.word2idx['<sos>']
             for j, word in enumerate(words):
                 if word not in self.word2idx:
-                    ids[j+1] = self.add_word("<unk>")
+                    ids[j+1] = self.word2idx("<unk>")
                 else:
                     ids[j+1] = self.word2idx[word]
             ids[j+2] = self.word2idx['<eos>']

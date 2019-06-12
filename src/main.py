@@ -33,12 +33,16 @@ def build_dictionary(vocab_path, tag_path):
     tag2idx['<PAD>'] = 0
     idx2word.append('<pad>')
     idx2tag.append('<PAD>')
-    word2idx['<sos>'] = 1
-    tag2idx['<SOS>'] = 1
+    word2idx['<unk>'] = 1
+    tag2idx['<UNK>'] = 1
+    idx2word.append('<unk>')
+    idx2tag.append('<UNK>')
+    word2idx['<sos>'] = 2
+    tag2idx['<SOS>'] = 2
     idx2word.append('<sos>')
     idx2tag.append('<SOS>')
-    word2idx['<eos>'] = 2
-    tag2idx['<EOS>'] = 2
+    word2idx['<eos>'] = 3
+    tag2idx['<EOS>'] = 3
     idx2word.append('<eos>')
     idx2tag.append('<EOS>')
 

@@ -24,6 +24,41 @@ def batchify(data, bsz):
     data = data.t()  # [seq_len, nbatch * bsz]
     return data
 
+def build_dictionary(vocab_path, tag_path):
+    word2idx = {}
+    tag2idx = {}
+    idx2tag = []
+    idx2word = []
+    word2idx['<pad>'] = 0
+    tag2idx['<PAD>'] = 0
+    idx2word.append('<pad>')
+    idx2tag.append('<PAD>')
+    word2idx['<sos>'] = 1
+    tag2idx['<SOS>'] = 1
+    idx2word.append('<sos>')
+    idx2tag.append('<SOS>')
+    word2idx['<eos>'] = 2
+    tag2idx['<EOS>'] = 2
+    idx2word.append('<eos>')
+    idx2tag.append('<EOS>')
+
+    with open(vocab_path, 'r') as f:
+        words = f.read().split('\n')
+    for word in words:
+        word = word.strip()
+        if word not in word2idx:
+            idx2word.append(word)
+            word2idx[word] = len(idx2word) - 1
+
+    with open(tag_path, 'r') as f:
+        tags = f.read().split('\n')
+    for tag in tags:
+        tag = tag.strip()
+        if tag not in tag2idx:
+            idx2tag.append(tag)
+            tag2idx[tag] = len(idx2tag) - 1
+    
+    return word2idx, tag2idx, idx2word, idx2tag
 
 ###############################################################################
 # Complexity measures
@@ -126,10 +161,10 @@ def repackage_hidden(h):
     
 def get_batch(lm_data, tag_data, i, evaluation=False):
     seq_len = min(args.bptt, lm_data.size(0))
-    input_token = Variable(lm_data[:seq_len-1, i*args.batch_size:(i+1)*args.batch_size], volatile=evaluation)
-    output_token = Variable(lm_data[1:seq_len, i*args.batch_size:(i+1)*args.batch_size])
-    input_tag = Variable(tag_data[:seq_len-1, i*args.batch_size:(i+1)*args.batch_size], volatile=evaluation)
-    output_tag = Variable(tag_data[1:seq_len, i*args.batch_size:(i+1)*args.batch_size])
+    input_token = Variable(lm_data[:seq_len-1, i:(i+args.batch_size)], volatile=evaluation)
+    output_token = Variable(lm_data[1:seq_len, i:(i+args.batch_size)])
+    input_tag = Variable(tag_data[:seq_len-1, i:(i+args.batch_size)], volatile=evaluation)
+    output_tag = Variable(tag_data[1:seq_len, i:(i+args.batch_size)])
     #This is where data should be CUDA-fied to lessen OOM errors
     if args.cuda:
         return input_token.cuda(), output_token.cuda(), input_tag.cuda(), output_tag.cuda()
@@ -214,7 +249,9 @@ def evaluate(args, valid_lm_data, valid_ccg_data):
     else:
         hidden = model.init_hidden(args.batch_size)
         
-    for i in range(0, train_lm_data.size(1), args.batch_size):
+    for i in range(0, valid_lm_data.size(1), args.batch_size):
+        if (i+1)*args.batch_size > valid_lm_data.size(1):
+            continue
         input_tokens, output_tokens, input_tags, output_tags = get_batch(valid_lm_data, valid_ccg_data, i)
         
         batch_loss = 0
@@ -242,10 +279,8 @@ def train(args, train_lm_data, train_ccg_data):
         hidden = model.init_hidden(args.batch_size)
 
     order = list(enumerate(range(0, train_lm_data.size(1), args.batch_size)))
-    random.seed(10)
-    random.shuffle(order)
     for batch, i in order:
-        if (i+1)*args.batch_size > train_lm_data.size(1):
+        if i + args.batch_size >= train_lm_data.size(1):
             continue
         input_tokens, output_tokens, input_tags, output_tags = get_batch(train_lm_data, train_ccg_data, i)
             
@@ -275,7 +310,7 @@ def train(args, train_lm_data, train_ccg_data):
             elapsed = time.time() - start_time
             print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | {:5.2f} ms/batch | '
                     'loss {:5.2f} '.format(
-                epoch, batch, train_lm_data.size(1) // args.bptt, lr,
+                epoch, batch, train_lm_data.size(1) // args.batch_size, lr,
                 elapsed * 1000 / args.log_interval, cur_loss))
             total_loss = 0
             start_time = time.time()
@@ -291,6 +326,10 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='PyTorch RNN/LSTM language modeling and CCG tagging multitask model')
     
+    parser.add_argument('--vocab_path', type=str, default='../data/vocab.txt',
+                        help='location of the language modeling corpus')
+    parser.add_argument('--tag_path', type=str, default='../data/tag.txt',
+                        help='location of the CCG corpus')
     parser.add_argument('--lm_data', type=str, default='../data/txt',
                         help='location of the language modeling corpus')
     parser.add_argument('--tag_data', type=str, default='../data/tag',
@@ -319,7 +358,7 @@ if __name__ == '__main__':
                         help='random seed')
     parser.add_argument('--cuda', action='store_true',
                         help='use CUDA')
-    parser.add_argument('--log-interval', type=int, default=200, metavar='N',
+    parser.add_argument('--log_interval', type=int, default=20, metavar='N',
                         help='report interval')
     parser.add_argument('--save', type=str,  default='../models/model.pt',
                         help='path to save the final model')
@@ -356,27 +395,12 @@ if __name__ == '__main__':
         os.mkdir('../models')
             
     # Load data
-    corpus = data.SentenceCorpus(args.bptt, args.lm_data, args.tag_data, 
-                                 save_to=args.save_lm_data, testflag=args.test)
-
-    if args.test:
-        test_lm_sentences, test_lm_data = corpus.test_lm
-        test_ccg_data = corpus.test_tag
-    else:
-        train_lm_data = batchify(corpus.train_lm, args.batch_size)
-        val_lm_data = batchify(corpus.valid_lm, args.batch_size)
-        train_ccg_data = batchify(corpus.train_tag, args.batch_size)
-        val_ccg_data = batchify(corpus.valid_tag, args.batch_size)
-        print('Number of training data:', train_lm_data.size(1))
-        print('Number of training tag:', train_ccg_data.size(1))
-        print('Number of validation data:', val_lm_data.size(1))
-        print('Number of validation tag:', val_ccg_data.size(1))
-        
-        
+    word2idx, tag2idx, idx2word, idx2tag = build_dictionary(args.vocab_path, args.tag_path)
+    
     # Build model
     if not args.test:
-        ntokens = len(corpus.dictionary.idx2word)
-        ntags = len(corpus.dictionary.idx2tag)
+        ntokens = len(idx2word)
+        ntags = len(idx2tag)
         print('Number of unique words:', ntokens)
         print('Number of unique tags:', ntags)
         print('Build model!!!')
@@ -394,8 +418,34 @@ if __name__ == '__main__':
     # At any point you can hit Ctrl + C to break out of training early.
     if not args.test:
         try:
+            files = os.listdir(args.lm_data)
+            files = sorted(files)
+            train_files = []
+            valid_files = []
+            for file in files:
+                prefix = file.split('_')[0]
+                if prefix == 'train':
+                    train_files.append(file)
+                if prefix == 'valid':
+                    valid_files.append(file)
             print('Start training!!!')
             for epoch in range(1, args.epochs+1):
+                train_fname = random.choice(train_files)
+                valid_fname = random.choice(valid_files)
+                corpus = data.SentenceCorpus(args.bptt, args.lm_data, args.tag_data, 
+                                             word2idx, tag2idx, idx2word, idx2tag,
+                                             train_fname, valid_fname, None,
+                                             save_to=args.save_lm_data, testflag=args.test)
+
+                train_lm_data = batchify(corpus.train_lm, args.batch_size)
+                val_lm_data = batchify(corpus.valid_lm, args.batch_size)
+                train_ccg_data = batchify(corpus.train_tag, args.batch_size)
+                val_ccg_data = batchify(corpus.valid_tag, args.batch_size)
+                print('Number of training data:', train_lm_data.size(1))
+                print('Number of training tag:', train_ccg_data.size(1))
+                print('Number of validation data:', val_lm_data.size(1))
+                print('Number of validation tag:', val_ccg_data.size(1))
+                    
                 epoch_start_time = time.time()
                 train(args, train_lm_data, train_ccg_data)
                 val_loss = evaluate(args, val_lm_data, val_ccg_data)
@@ -418,9 +468,27 @@ if __name__ == '__main__':
         # Load the best saved model.
         with open(args.save, 'rb') as f:
             model = torch.load(f)
-        # Run on test data.
-        test_loss = test_evaluate(args, test_lm_sentences, test_lm_data, test_ccg_data)
+        
+        files = os.listdir(args.lm_data)
+        files = sorted(files)
+        test_files = []
+        for file in files:
+            prefix = file.split('_')[0]
+            if prefix == 'test':
+                test_files.append(file)
+                
+        test_loss = 0.
+        for test_fname in test_files:
+            corpus = data.SentenceCorpus(args.bptt, args.lm_data, args.tag_data, 
+                                         word2idx, tag2idx, idx2word, idx2tag,
+                                         None, None, test_fname,
+                                         save_to=args.save_lm_data, testflag=args.test)
+            
+            test_lm_sentences, test_lm_data = corpus.test_lm
+            test_ccg_data = corpus.test_tag
+            
+            # Run on test data.
+            test_loss += test_evaluate(args, test_lm_sentences, test_lm_data, test_ccg_data)
         print('=' * 89)
-        print('| End of training | test loss {:5.2f} | test ppl {:8.2f}'.format(
-            test_loss, math.exp(test_loss)))
+        print('| End of testing | test loss {:5.2f} '.format(test_loss))
         print('=' * 89)

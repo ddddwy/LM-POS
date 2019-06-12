@@ -352,7 +352,7 @@ if __name__ == '__main__':
                         help='gradient clipping')
     parser.add_argument('--epochs', type=int, default=40,
                         help='upper epoch limit')
-    parser.add_argument('--batch_size', type=int, default=20, metavar='N',
+    parser.add_argument('--batch_size', type=int, default=16, metavar='N',
                         help='batch size')
     parser.add_argument('--bptt', type=int, default=35,
                         help='sequence length')

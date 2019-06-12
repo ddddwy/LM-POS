@@ -362,7 +362,7 @@ if __name__ == '__main__':
                         help='random seed')
     parser.add_argument('--cuda', action='store_true',
                         help='use CUDA')
-    parser.add_argument('--log_interval', type=int, default=20, metavar='N',
+    parser.add_argument('--log_interval', type=int, default=100, metavar='N',
                         help='report interval')
     parser.add_argument('--save', type=str,  default='../models/model.pt',
                         help='path to save the final model')
@@ -445,10 +445,6 @@ if __name__ == '__main__':
                 val_lm_data = batchify(corpus.valid_lm, args.batch_size)
                 train_ccg_data = batchify(corpus.train_tag, args.batch_size)
                 val_ccg_data = batchify(corpus.valid_tag, args.batch_size)
-                print('Number of training data:', train_lm_data.size(1))
-                print('Number of training tag:', train_ccg_data.size(1))
-                print('Number of validation data:', val_lm_data.size(1))
-                print('Number of validation tag:', val_ccg_data.size(1))
                     
                 epoch_start_time = time.time()
                 train(args, train_lm_data, train_ccg_data)

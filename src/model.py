@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.autograd import Variable
 
 class RNNModel(nn.Module):
@@ -53,9 +52,8 @@ class RNNModel(nn.Module):
         
         h_tag = self.w_tag_mid(output)
         h_word = self.w_word_mid(output)
-        p_tag = F.softmax(self.w_tag_out(h_tag), dim=1)
-        h_word_final = self.w_word_out(h_tag + h_word)
-        p_word = F.softmax(h_word_final, dim=1)
+        p_tag = self.w_tag_out(h_tag)
+        p_word = self.w_word_out(h_tag + h_word)
         return p_word, p_tag, hidden
 
     def init_hidden(self, bsz):

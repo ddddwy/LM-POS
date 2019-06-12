@@ -24,6 +24,10 @@ class Dictionary(object):
         self.tag2idx = {}
         self.idx2tag = []
         self.idx2word = []
+        self.word2idx['<pad>'] = 0
+        self.tag2idx['<PAD>'] = 0
+        self.idx2word.append('<pad>')
+        self.idx2tag.append('<PAD>')
 
     def add_word(self, word):
         if word not in self.word2idx:

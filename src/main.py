@@ -12,7 +12,6 @@ import os
 import random
 
 
-
 ###############################################################################
 # Load data
 ###############################################################################
@@ -327,7 +326,7 @@ if __name__ == '__main__':
                         help='path to save the final model')
     parser.add_argument('--single', action='store_true',
                         help='use only a single GPU (even if more are available)')
-    parser.add_argument('--save_lm_data', type=str, default='lm_data.bin',
+    parser.add_argument('--save_lm_data', type=str, default='../models/lm_data.bin',
                         help='path to save the LM data')
     parser.add_argument('--test', action='store_true',
                         help='test a trained LM')

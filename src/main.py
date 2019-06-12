@@ -255,13 +255,12 @@ def train(args, train_lm_data, train_ccg_data):
         model.zero_grad()
         batch_loss = 0
         for t in range(min(args.bptt-1, train_lm_data.size(0)-1)):
-            input_token = input_tokens[t].unsqueeze(0)
-            input_tag = input_tags[t].unsqueeze(0)
+            input_token = input_tokens[t].unsqueeze(0)  # [batch_size, 1]
+            input_tag = input_tags[t].unsqueeze(0)  # [batch_size, 1]
             p_word, p_tag, hidden = model(input_token, input_tag, hidden) # p_word = [batch_size, ntoken]
             word_loss = criterion(p_word, output_tokens[t])
             tag_loss = criterion(p_tag, output_tags[t])
             batch_loss += word_loss + tag_loss
-        print(batch_loss)
         batch_loss.backward()
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
@@ -275,9 +274,9 @@ def train(args, train_lm_data, train_ccg_data):
             cur_loss = total_loss / args.log_interval
             elapsed = time.time() - start_time
             print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | {:5.2f} ms/batch | '
-                    'loss {:5.2f} | ppl {:8.2f}'.format(
+                    'loss {:5.2f} '.format(
                 epoch, batch, train_lm_data.size(1) // args.bptt, lr,
-                elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
+                elapsed * 1000 / args.log_interval, cur_loss))
             total_loss = 0
             start_time = time.time()
 
@@ -353,7 +352,7 @@ if __name__ == '__main__':
         else:
             torch.cuda.manual_seed(args.seed)
             
-    if not os.path.exists(args.save):
+    if not os.path.exists('../models'):
         os.mkdir('../models')
             
     # Load data
@@ -401,9 +400,8 @@ if __name__ == '__main__':
                 train(args, train_lm_data, train_ccg_data)
                 val_loss = evaluate(args, val_lm_data, val_ccg_data)
                 print('-' * 89)
-                print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
-                      'valid ppl {:8.2f}'.format(epoch, (time.time() - epoch_start_time),
-                                                 val_loss, math.exp(val_loss)))
+                print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} '.format(epoch, 
+                      (time.time() - epoch_start_time), val_loss))
                 print('-' * 89)
                 # Save the model if the validation loss is the best we've seen so far.
                 if not best_val_loss or val_loss < best_val_loss:

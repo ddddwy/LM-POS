@@ -64,10 +64,10 @@ def split_data(data_dir):
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Data script")
-    parser.add_argument("-start", type=int, required=True, 
-                        help="")
-    parser.add_argument("-end", type=int, required=True, 
-                        help="")
+    parser.add_argument("--s", type=int, required=True, 
+                        help="Start of splitting index")
+    parser.add_argument("--e", type=int, required=True, 
+                        help="End of splitting index")
     parser.add_argument('--data', action='store_true', default=False,
                         help='Split the origin data')
     args = parser.parse_args()

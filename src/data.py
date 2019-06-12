@@ -28,6 +28,14 @@ class Dictionary(object):
         self.tag2idx['<PAD>'] = 0
         self.idx2word.append('<pad>')
         self.idx2tag.append('<PAD>')
+        self.word2idx['<sos>'] = 1
+        self.tag2idx['<SOS>'] = 1
+        self.idx2word.append('<sos>')
+        self.idx2tag.append('<SOS>')
+        self.word2idx['<eos>'] = 2
+        self.tag2idx['<EOS>'] = 2
+        self.idx2word.append('<eos>')
+        self.idx2tag.append('<EOS>')
 
     def add_word(self, word):
         if word not in self.word2idx:
@@ -104,8 +112,11 @@ class SentenceCorpus(object):
                 for i, line in enumerate(lines):
                     if line.strip() != "":
                         tags = line.strip().split()
-                        for j, tag in enumerate(tags[:self.seq_len]):
-                            tag_ids[idx, j] = self.dictionary.tag2idx[tag]
+                        tag_ids[idx, 0] = self.dictionary.tag2idx['<SOS>']
+                        for j, tag in enumerate(tags[:self.seq_len-1]):
+                            tag_ids[idx, j+1] = self.dictionary.tag2idx[tag]
+                        if j+1 < self.seq_len-1:
+                            tag_ids[idx, j+2] = self.dictionary.tag2idx['EOS']
                         idx += 1
         return tag_ids
 
@@ -136,11 +147,14 @@ class SentenceCorpus(object):
                 for i, line in enumerate(lines):
                     if line.strip() != "":
                         tags = line.strip().split()
-                        for j, tag in enumerate(tags[:self.seq_len]):
+                        tag_ids[idx, 0] = self.dictionary.tag2idx['<SOS>']
+                        for j, tag in enumerate(tags[:self.seq_len-1]):
                             if tag not in self.dictionary.tag2idx:
-                                tag_ids[idx, j] = self.dictionary.add_tag["<UNK>"]
+                                tag_ids[idx, j+1] = self.dictionary.add_tag["<UNK>"]
                             else:
-                                tag_ids[idx, j] = self.dictionary.tag2idx[tag]
+                                tag_ids[idx, j+1] = self.dictionary.tag2idx[tag]
+                        if j+1 < self.seq_len-1:
+                            tag_ids[idx, j+2] = self.dictionary.tag2idx['EOS']
                         idx += 1
         return tag_ids
     
@@ -170,12 +184,14 @@ class SentenceCorpus(object):
                 for i, line in enumerate(lines):
                     if line.strip() != "":
                         tags = line.strip().split()
-                        tag_ids = torch.LongTensor(len(tags))
+                        tag_ids = torch.LongTensor(len(tags)+2)
+                        tag_ids[0] = self.dictionary.tag2idx['<SOS>']
                         for j, tag in enumerate(tags):
                             if tag not in self.dictionary.tag2idx:
-                                tag_ids[j] = self.dictionary.add_tag["<UNK>"]
+                                tag_ids[j+1] = self.dictionary.add_tag["<UNK>"]
                             else:
-                                tag_ids[j] = self.dictionary.tag2idx[tag]
+                                tag_ids[j+1] = self.dictionary.tag2idx[tag]
+                        tag_ids[j+2] = self.dictionary.tag2idx['<EOS>']
                         all_tags.append(tag_ids)
         return all_tags
 
@@ -213,8 +229,11 @@ class SentenceCorpus(object):
                     if line.strip() == "":
                         continue
                     words = line.strip().split()
-                    for j, word in enumerate(words[:self.seq_len]):
-                        ids[idx, j] = self.dictionary.word2idx[word]
+                    ids[idx, 0] = self.dictionary.word2idx['<sos>']
+                    for j, word in enumerate(words[:self.seq_len-1]):
+                        ids[idx, j+1] = self.dictionary.word2idx[word]
+                    if j+1 < self.seq_len-1:
+                        ids[idx, j+2] = self.dictionary.word2idx['<eos>']
                     idx += 1
         return ids
 
@@ -246,11 +265,14 @@ class SentenceCorpus(object):
                     if line.strip() == "":
                         continue
                     words = line.strip().split()
-                    for j, word in enumerate(words[:self.seq_len]):
+                    ids[idx, 0] = self.dictionary.word2idx['<sos>']
+                    for j, word in enumerate(words[:self.seq_len-1]):
                         if word not in self.dictionary.word2idx:
-                            ids[idx, j] = self.dictionary.add_word("<unk>")
+                            ids[idx, j+1] = self.dictionary.add_word("<unk>")
                         else:
-                            ids[idx, j] = self.dictionary.word2idx[word]
+                            ids[idx, j+1] = self.dictionary.word2idx[word]
+                    if j+1 < self.seq_len-1:
+                        ids[idx, j+2] = self.dictionary.word2idx['<eos>']
                     idx += 1
         return ids
 
@@ -273,11 +295,13 @@ class SentenceCorpus(object):
                     sents.append(line.strip())
                     words = line.strip().split()
                     # tokenize file content
-                    ids = torch.LongTensor(len(words))
+                    ids = torch.LongTensor(len(words)+2)
+                    ids[0] = self.dictionary.word2idx['<sos>']
                     for j, word in enumerate(words):
                         if word not in self.dictionary.word2idx:
-                            ids[j] = self.dictionary.add_word("<unk>")
+                            ids[j+1] = self.dictionary.add_word("<unk>")
                         else:
-                            ids[j] = self.dictionary.word2idx[word]
+                            ids[j+1] = self.dictionary.word2idx[word]
+                    ids[j+2] = self.dictionary.word2idx['<eos>']
                     all_ids.append(ids)                
         return (sents, all_ids)

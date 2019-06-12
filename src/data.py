@@ -41,20 +41,19 @@ class Dictionary(object):
         return len(self.idx2word)
 
 class SentenceCorpus(object):
-    def __init__(self, seq_len, lm_path, tag_path, trainfname, validfname, testfname, 
-                 save_to='lm_data.bin', testflag=False):
+    def __init__(self, seq_len, lm_path, tag_path, save_to='lm_data.bin', testflag=False):
         self.seq_len = seq_len
         if not testflag:
             self.dictionary = Dictionary()
-            self.train_lm = self.tokenize(os.path.join(lm_path, trainfname))
-            self.valid_lm = self.tokenize_with_unks(os.path.join(lm_path, validfname))
-            self.train_tag = self.tokenize_tag(os.path.join(tag_path, trainfname))
-            self.valid_tag = self.tokenize_tag_with_unks(os.path.join(tag_path, validfname))
+            self.train_lm = self.tokenize(lm_path, 'train')
+            self.valid_lm = self.tokenize_with_unks(lm_path, 'valid')
+            self.train_tag = self.tokenize_tag(tag_path, 'train')
+            self.valid_tag = self.tokenize_tag_with_unks(tag_path, 'valid')
             self.save_to = self.save_dict(save_to)
         else:
             self.dictionary = self.load_dict(save_to)
-            self.test_lm = self.sent_tokenize_with_unks(os.path.join(lm_path, testfname))
-            self.test_tag = self.sent_tokenize_tag_with_unks(os.path.join(tag_path, testfname))
+            self.test_lm = self.sent_tokenize_with_unks(lm_path, 'test')
+            self.test_tag = self.sent_tokenize_tag_with_unks(tag_path, 'test')
 
     def save_dict(self, path):
         with open(path, 'wb') as f:
@@ -69,125 +68,212 @@ class SentenceCorpus(object):
                 return(fdata[3])
             return(fdata)
 
-    def tokenize_tag(self, path):
+    def tokenize_tag(self, path, mode):
         """Tokenizes and gets POS tags for a text file."""
         assert os.path.exists(path)
-
-        # Add words and tags to the dictionary
-        with open(path, 'r') as f:
-            lines = f.read().split('\n')
-        for line in lines:
-            if line.strip() != "":
-                tags = line.strip().split()
-                for tag in tags:
-                    self.dictionary.add_tag(tag)
+        files = os.listdir(path)
+        total_num = 0
+        for file in files:
+            fname = file.split('_')
+            if fname[0] == mode:
+                fpath = os.path.join(path, file)
+                # Add words and tags to the dictionary
+                with open(fpath, 'r') as f:
+                    lines = f.read().split('\n')
+                total_num += len(lines)
+                for line in lines:
+                    if line.strip() != "":
+                        tags = line.strip().split()
+                        for tag in tags:
+                            self.dictionary.add_tag(tag)
                     
         # Tokenize file content
-        tag_ids = torch.zeros((len(lines), self.seq_len), dtype=torch.long)
-        for i, line in enumerate(lines):
-            if line.strip() != "":
-                tags = line.strip().split()
-                for j, tag in enumerate(tags[:self.seq_len]):
-                    tag_ids[i, j] = self.dictionary.tag2idx[tag]
+        tag_ids = torch.zeros((total_num, self.seq_len), dtype=torch.long)
+        idx = 0
+        for file in files:
+            fname = file.split('_')
+            if fname[0] == mode:
+                fpath = os.path.join(path, file)
+                print('Processing file: '+fpath)
+                with open(fpath, 'r+', encoding="utf-8") as f:
+                    lines = f.read().split('\n')
+                for i, line in enumerate(lines):
+                    if line.strip() != "":
+                        tags = line.strip().split()
+                        for j, tag in enumerate(tags[:self.seq_len]):
+                            tag_ids[idx, j] = self.dictionary.tag2idx[tag]
+                        idx += 1
         return tag_ids
 
-    def tokenize_tag_with_unks(self, path):
+    def tokenize_tag_with_unks(self, path, mode):
         """Tokenizes and gets POS tags for a text file."""
         assert os.path.exists(path)
-        with open(path, 'r') as f:
-            lines = f.read().split('\n')
+        files = os.listdir(path)
+        total_num = 0
+        for file in files:
+            fname = file.split('_')
+            if fname[0] == mode:
+                fpath = os.path.join(path, file)
+                # Add words and tags to the dictionary
+                with open(fpath, 'r') as f:
+                    lines = f.read().split('\n')
+                total_num += len(lines)
+                
         # Tokenize file content
-        tag_ids = torch.zeros((len(lines), self.seq_len), dtype=torch.long)
-        for i, line in enumerate(lines):
-            if line.strip() != "":
-                tags = line.strip().split()
-                for j, tag in enumerate(tags[:self.seq_len]):
-                    if tag not in self.dictionary.tag2idx:
-                        tag_ids[i, j] = self.dictionary.add_tag["<UNK>"]
-                    else:
-                        tag_ids[i, j] = self.dictionary.tag2idx[tag]
+        tag_ids = torch.zeros((total_num, self.seq_len), dtype=torch.long)
+        idx = 0
+        for file in files:
+            fname = file.split('_')
+            if fname[0] == mode:
+                fpath = os.path.join(path, file)
+                print('Processing file: '+fpath)
+                with open(fpath, 'r+', encoding="utf-8") as f:
+                    lines = f.read().split('\n')
+                for i, line in enumerate(lines):
+                    if line.strip() != "":
+                        tags = line.strip().split()
+                        for j, tag in enumerate(tags[:self.seq_len]):
+                            if tag not in self.dictionary.tag2idx:
+                                tag_ids[idx, j] = self.dictionary.add_tag["<UNK>"]
+                            else:
+                                tag_ids[idx, j] = self.dictionary.tag2idx[tag]
+                        idx += 1
         return tag_ids
     
-    def sent_tokenize_tag_with_unks(self, path):
+    def sent_tokenize_tag_with_unks(self, path, mode):
         """Tokenizes and gets POS tags for a text file."""
         assert os.path.exists(path)
-        with open(path, 'r') as f:
-            lines = f.read().split('\n')
+        files = os.listdir(path)
+        total_num = 0
+        for file in files:
+            fname = file.split('_')
+            if fname[0] == mode:
+                fpath = os.path.join(path, file)
+                # Add words and tags to the dictionary
+                with open(fpath, 'r') as f:
+                    lines = f.read().split('\n')
+                total_num += len(lines)
+        
         # Tokenize file content
         all_tags = []
-        for i, line in enumerate(lines):
-            if line.strip() != "":
-                tags = line.strip().split()
-                tag_ids = torch.LongTensor(len(tags))
-                for j, tag in enumerate(tags):
-                    if tag not in self.dictionary.tag2idx:
-                        tag_ids[i, j] = self.dictionary.add_tag["<UNK>"]
-                    else:
-                        tag_ids[i, j] = self.dictionary.tag2idx[tag]
-                all_tags.append(tag_ids)
+        for file in files:
+            fname = file.split('_')
+            if fname[0] == mode:
+                fpath = os.path.join(path, file)
+                print('Processing file: '+fpath)
+                with open(fpath, 'r+', encoding="utf-8") as f:
+                    lines = f.read().split('\n')
+                for i, line in enumerate(lines):
+                    if line.strip() != "":
+                        tags = line.strip().split()
+                        tag_ids = torch.LongTensor(len(tags))
+                        for j, tag in enumerate(tags):
+                            if tag not in self.dictionary.tag2idx:
+                                tag_ids[j] = self.dictionary.add_tag["<UNK>"]
+                            else:
+                                tag_ids[j] = self.dictionary.tag2idx[tag]
+                        all_tags.append(tag_ids)
         return all_tags
 
-    def tokenize(self, path):
+    def tokenize(self, path, mode):
         """Tokenizes a text file."""
         assert os.path.exists(path)
-        # Add words to the dictionary
-        with open(path, 'r+', encoding="utf-8") as f:
-            lines = f.read().split('\n')
-        for line in lines:
-            if line.strip() == "":
-                continue
-            words = line.strip().split()
-            for word in words:
-                self.dictionary.add_word(word)
+        files = os.listdir(path)
+        total_num = 0
+        for file in files:
+            fname = file.split('_')
+            if fname[0] == mode:
+                fpath = os.path.join(path, file)
+                # Add words to the dictionary
+                with open(fpath, 'r+', encoding="utf-8") as f:
+                    lines = f.read().split('\n')
+                total_num += len(lines)
+                for line in lines:
+                    if line.strip() == "":
+                        continue
+                    words = line.strip().split()
+                    for word in words:
+                        self.dictionary.add_word(word)
 
         # Tokenize file content
-        with open(path, 'r+', encoding="utf-8") as f:
-            lines = f.read().split('\n')
-        ids = torch.zeros((len(lines), self.seq_len), dtype=torch.long)
-        for i, line in enumerate(lines):
-            if line.strip() == "":
-                continue
-            words = line.strip().split()
-            for j, word in enumerate(words[:self.seq_len]):
-                ids[i, j] = self.dictionary.word2idx[word]
+        ids = torch.zeros((total_num, self.seq_len), dtype=torch.long)
+        idx = 0
+        for file in files:
+            fname = file.split('_')
+            if fname[0] == mode:
+                fpath = os.path.join(path, file)
+                print('Processing file: '+fpath)
+                with open(fpath, 'r+', encoding="utf-8") as f:
+                    lines = f.read().split('\n')
+                for i, line in enumerate(lines):
+                    if line.strip() == "":
+                        continue
+                    words = line.strip().split()
+                    for j, word in enumerate(words[:self.seq_len]):
+                        ids[idx, j] = self.dictionary.word2idx[word]
+                    idx += 1
         return ids
 
-    def tokenize_with_unks(self, path):
+    def tokenize_with_unks(self, path, mode):
         """Tokenizes a text file, adding unks if needed."""
         assert os.path.exists(path)
+        files = os.listdir(path)
+        total_num = 0
+        for file in files:
+            fname = file.split('_')
+            if fname[0] == mode:
+                fpath = os.path.join(path, file)
+                # Add words to the dictionary
+                with open(fpath, 'r+', encoding="utf-8") as f:
+                    lines = f.read().split('\n')
+                total_num += len(lines)
+                
         # Tokenize file content
-        with open(path, 'r+', encoding="utf-8") as f:
-            lines = f.read().split('\n')
-        ids = torch.zeros((len(lines), self.seq_len), dtype=torch.long)
-        for i, line in enumerate(lines):
-            if line.strip() == "":
-                continue
-            words = line.strip().split()
-            for j, word in enumerate(words[:self.seq_len]):
-                if word not in self.dictionary.word2idx:
-                    ids[i, j] = self.dictionary.add_word("<unk>")
-                else:
-                    ids[i, j] = self.dictionary.word2idx[word]
+        ids = torch.zeros((total_num, self.seq_len), dtype=torch.long)
+        idx = 0
+        for file in files:
+            fname = file.split('_')
+            if fname[0] == mode:
+                fpath = os.path.join(path, file)
+                print('Processing file: '+fpath)
+                with open(fpath, 'r+', encoding="utf-8") as f:
+                    lines = f.read().split('\n')
+                for i, line in enumerate(lines):
+                    if line.strip() == "":
+                        continue
+                    words = line.strip().split()
+                    for j, word in enumerate(words[:self.seq_len]):
+                        if word not in self.dictionary.word2idx:
+                            ids[idx, j] = self.dictionary.add_word("<unk>")
+                        else:
+                            ids[idx, j] = self.dictionary.word2idx[word]
+                    idx += 1
         return ids
 
-    def sent_tokenize_with_unks(self, path):
+    def sent_tokenize_with_unks(self, path, mode):
         """Tokenizes a text file into sentences, adding unks if needed."""
         assert os.path.exists(path)
-        with open(path, 'r+', encoding="utf-8") as f:
-            lines = f.read().split('\n')
         all_ids = []
         sents = []
-        for line in lines:
-            if line.strip() == "":
-                continue
-            sents.append(line.strip())
-            words = line.strip().split()
-            # tokenize file content
-            ids = torch.LongTensor(len(words))
-            for j, word in enumerate(words):
-                if word not in self.dictionary.word2idx:
-                    ids[j] = self.dictionary.add_word("<unk>")
-                else:
-                    ids[j] = self.dictionary.word2idx[word]
-            all_ids.append(ids)                
+        files = os.listdir(path)
+        for file in files:
+            fname = file.split('_')
+            if fname[0] == mode:
+                fpath = os.path.join(path, file)
+                print('Processing file: '+fpath)
+                with open(fpath, 'r+', encoding="utf-8") as f:
+                    lines = f.read().split('\n')
+                for line in lines:
+                    if line.strip() == "":
+                        continue
+                    sents.append(line.strip())
+                    words = line.strip().split()
+                    # tokenize file content
+                    ids = torch.LongTensor(len(words))
+                    for j, word in enumerate(words):
+                        if word not in self.dictionary.word2idx:
+                            ids[j] = self.dictionary.add_word("<unk>")
+                        else:
+                            ids[j] = self.dictionary.word2idx[word]
+                    all_ids.append(ids)                
         return (sents, all_ids)

@@ -116,7 +116,7 @@ class SentenceCorpus(object):
                         for j, tag in enumerate(tags[:self.seq_len-1]):
                             tag_ids[idx, j+1] = self.dictionary.tag2idx[tag]
                         if j+1 < self.seq_len-1:
-                            tag_ids[idx, j+2] = self.dictionary.tag2idx['EOS']
+                            tag_ids[idx, j+2] = self.dictionary.tag2idx['<EOS>']
                         idx += 1
         return tag_ids
 
@@ -154,7 +154,7 @@ class SentenceCorpus(object):
                             else:
                                 tag_ids[idx, j+1] = self.dictionary.tag2idx[tag]
                         if j+1 < self.seq_len-1:
-                            tag_ids[idx, j+2] = self.dictionary.tag2idx['EOS']
+                            tag_ids[idx, j+2] = self.dictionary.tag2idx['<EOS>']
                         idx += 1
         return tag_ids
     

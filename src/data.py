@@ -42,8 +42,8 @@ class Dictionary(object):
         return len(self.idx2word)
 
 class SentenceCorpus(object):
-    def __init__(self, seq_len, lm_path, tag_path, save_to='lm_data.bin', testflag=False,
-                 trainfname, validfname, testfname):
+    def __init__(self, seq_len, lm_path, tag_path, trainfname, validfname, testfname, 
+                 save_to='lm_data.bin', testflag=False):
         self.seq_len = seq_len
         if not testflag:
             self.dictionary = Dictionary()

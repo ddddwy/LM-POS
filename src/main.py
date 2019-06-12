@@ -101,10 +101,10 @@ def batchify(data, bsz):
     return data
 
 corpus = data.SentenceCorpus(args.bptt, args.lm_data, args.tag_data, 
-                             args.save_lm_data, args.test,
                              trainfname=args.trainfname,
                              validfname=args.validfname,
-                             testfname=args.testfname)
+                             testfname=args.testfname,
+                             args.save_lm_data, args.test)
 
 if args.test:
     test_lm_sentences, test_lm_data = corpus.test_lm

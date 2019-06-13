@@ -210,11 +210,7 @@ def test_evaluate(args, test_lm_sentences, lm_data_source, ccg_data_source):
         if args.cuda:
             sent_ids = sent_ids.cuda()
             tag_ids = tag_ids.cuda()
-        if (not args.single) and (torch.cuda.device_count() > 1):
-            # "module" is necessary when using DataParallel
-            hidden = model.module.init_hidden(1) # number of parallel sentences being processed
-        else:
-            hidden = model.init_hidden(1) # number of parallel sentences being processed
+        hidden = model.init_hidden(1) # number of parallel sentences being processed
         
         input_tokens, output_tokens, input_tags, output_tags = test_get_batch(sent_ids, tag_ids, evaluation=True)
         input_tokens = input_tokens.unsqueeze(1)  # [seq_len, 1] 
@@ -247,11 +243,7 @@ def evaluate(args, valid_lm_data, valid_ccg_data):
     # Turn on evaluation mode which disables dropout.
     model.eval()
     total_loss = 0
-    if (not args.single) and (torch.cuda.device_count() > 1):
-        #"module" is necessary when using DataParallel
-        hidden = model.module.init_hidden(args.batch_size)
-    else:
-        hidden = model.init_hidden(args.batch_size)
+    hidden = model.init_hidden(args.batch_size)
         
     for i in range(0, valid_lm_data.size(1), args.batch_size):
         if (i+1)*args.batch_size > valid_lm_data.size(1):
@@ -276,11 +268,7 @@ def train(args, train_lm_data, train_ccg_data):
     model.train()
     total_loss = 0
     start_time = time.time()
-    if (not args.single) and (torch.cuda.device_count() > 1):
-        # "module" is necessary when using DataParallel
-        hidden = model.module.init_hidden(args.batch_size)
-    else:
-        hidden = model.init_hidden(args.batch_size)
+    hidden = model.init_hidden(args.batch_size)
 
     order = list(enumerate(range(0, train_lm_data.size(1), args.batch_size)))
     for batch, i in order:
@@ -294,8 +282,8 @@ def train(args, train_lm_data, train_ccg_data):
         model.zero_grad()
         batch_loss = 0
         for t in range(min(args.bptt-1, train_lm_data.size(0)-1)):
-            input_token = input_tokens[t].unsqueeze(0)  # [batch_size, 1]
-            input_tag = input_tags[t].unsqueeze(0)  # [batch_size, 1]
+            input_token = input_tokens[t].unsqueeze(1)  # [batch_size, 1]
+            input_tag = input_tags[t].unsqueeze(1)  # [batch_size, 1]
             p_word, p_tag, hidden = model(input_token, input_tag, hidden) # p_word = [batch_size, ntoken]
             word_loss = criterion(p_word, output_tokens[t])
             tag_loss = criterion(p_tag, output_tags[t])
@@ -366,8 +354,6 @@ if __name__ == '__main__':
                         help='report interval')
     parser.add_argument('--save', type=str,  default='../models/model.pt',
                         help='path to save the final model')
-    parser.add_argument('--single', action='store_true',
-                        help='use only a single GPU (even if more are available)')
     parser.add_argument('--save_lm_data', type=str, default='../models/lm_data.bin',
                         help='path to save the LM data')
     parser.add_argument('--test', action='store_true',
@@ -410,9 +396,6 @@ if __name__ == '__main__':
         print('Build model!!!')
         model = model.RNNModel(args.model, ntokens, ntags, args.emsize, args.nhid, args.nlayers, args.dropout)
         if args.cuda:
-            if (not args.single) and (torch.cuda.device_count() > 1):
-                # Scatters minibatches (in dim=1) across available GPUs
-                model = nn.DataParallel(model, dim=1)
             model.cuda()
     
     criterion = nn.CrossEntropyLoss()

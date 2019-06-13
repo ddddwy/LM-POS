@@ -48,7 +48,7 @@ class RNNModel(nn.Module):
         
         output, hidden = self.rnn(emb, hidden)  # hidden[0] = [num_layers, batch, hidden_size]
         output = self.drop(output)   # [1, batch_size, hidden_size]
-        output = output.view(output.size(0)*output.size(1), output.size(2)) # [batch_size, hidden_size]
+        output = output.squeeze(0)   # [batch_size, hidden_size]
         
         h_tag = self.w_tag_mid(output)
         h_word = self.w_word_mid(output)

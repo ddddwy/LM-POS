@@ -225,7 +225,7 @@ def test_evaluate(args, test_lm_sentences, lm_data_source, ccg_data_source):
             tag_loss = criterion(p_tag, output_tags[t])
             curr_loss += word_loss + tag_loss
         
-        total_loss += curr_loss
+        total_loss += float(curr_loss)
         '''
         if args.words:
             # output word-level complexity metrics
@@ -259,7 +259,7 @@ def evaluate(args, valid_lm_data, valid_ccg_data):
             tag_loss = criterion(p_tag, output_tags[t])
             batch_loss += word_loss + tag_loss
         
-        total_loss += batch_loss
+        total_loss += float(batch_loss)
         hidden = repackage_hidden(hidden)
     return total_loss / valid_lm_data.size(1)
 

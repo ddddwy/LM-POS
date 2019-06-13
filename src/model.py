@@ -49,10 +49,10 @@ class RNNModel(nn.Module):
         output = self.drop(output)   # [1, batch_size, hidden_size]
         output = output.squeeze(0)   # [batch_size, hidden_size]
         
-        h_tag = self.w_tag_mid(tag_emb.squeeze(0))
-        h_word = self.w_word_mid(output)
-        p_tag = self.w_tag_out(h_tag)
-        p_word = self.w_word_out(h_tag + h_word)
+        h_tag = self.w_tag_mid(tag_emb.squeeze(0))  # [batch_size, hidden_size]
+        h_word = self.w_word_mid(output)  # [batch_size, hidden_size]
+        p_tag = self.w_tag_out(h_tag)     # [batch_size, tag_size]
+        p_word = self.w_word_out(h_tag + h_word)  # [batch_size, vocab_size]
         return p_word, p_tag, hidden
 
     def init_hidden(self, bsz):

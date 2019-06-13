@@ -294,7 +294,7 @@ def train(args, train_lm_data, train_ccg_data, criterion, optimizer):
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
         optimizer.step()
 
-        total_loss += batch_loss.item()
+        total_loss += float(batch_loss)
 
         if batch % args.log_interval == 0 and batch > 0:
             cur_loss = total_loss / args.log_interval

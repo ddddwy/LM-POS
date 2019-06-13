@@ -9,16 +9,16 @@ class RNNModel(nn.Module):
         self.word_emb = nn.Embedding(ntoken, ninp)
         self.tag_emb = nn.Embedding(ntag, ninp)
         if rnn_type in ['LSTM', 'GRU']:
-            self.rnn = getattr(nn, rnn_type)(2*ninp, nhid, nlayers, dropout=dropout)
+            self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=dropout)
         else:
             try:
                 nonlinearity = {'RNN_TANH': 'tanh', 'RNN_RELU': 'relu'}[rnn_type]
             except KeyError:
                 raise ValueError( """An invalid option for `--model` was supplied,
                                  options are ['LSTM', 'GRU', 'RNN_TANH' or 'RNN_RELU']""")
-            self.rnn = nn.RNN(2*ninp, nhid, nlayers, nonlinearity=nonlinearity, dropout=dropout)
+            self.rnn = nn.RNN(ninp, nhid, nlayers, nonlinearity=nonlinearity, dropout=dropout)
         
-        self.w_tag_mid = nn.Linear(nhid, nhid)
+        self.w_tag_mid = nn.Linear(ninp, nhid)
         self.w_word_mid = nn.Linear(nhid, nhid)
         self.w_tag_out = nn.Linear(nhid, ntag)
         self.w_word_out = nn.Linear(nhid, ntoken)
@@ -44,13 +44,12 @@ class RNNModel(nn.Module):
     def forward(self, input_token, input_tag, hidden):
         word_emb = self.drop(self.word_emb(input_token))  # [1, batch_size, emb_size]
         tag_emb = self.drop(self.tag_emb(input_tag))  # [1, batch_size, emb_size]
-        emb = torch.cat((word_emb, tag_emb), 2)  # [1, batch_size, 2*emb_size]
         
-        output, hidden = self.rnn(emb, hidden)  # hidden[0] = [num_layers, batch, hidden_size]
+        output, hidden = self.rnn(word_emb, hidden)  # hidden[0] = [num_layers, batch, hidden_size]
         output = self.drop(output)   # [1, batch_size, hidden_size]
         output = output.squeeze(0)   # [batch_size, hidden_size]
         
-        h_tag = self.w_tag_mid(output)
+        h_tag = self.w_tag_mid(tag_emb)
         h_word = self.w_word_mid(output)
         p_tag = self.w_tag_out(h_tag)
         p_word = self.w_word_out(h_tag + h_word)

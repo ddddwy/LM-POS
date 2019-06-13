@@ -349,7 +349,7 @@ if __name__ == '__main__':
                         help='random seed')
     parser.add_argument('--cuda', action='store_true',
                         help='use CUDA')
-    parser.add_argument('--log_interval', type=int, default=100, metavar='N',
+    parser.add_argument('--log_interval', type=int, default=1000, metavar='N',
                         help='report interval')
     parser.add_argument('--save', type=str,  default='../models/model.pt',
                         help='path to save the final model')
@@ -397,12 +397,12 @@ if __name__ == '__main__':
     
     criterion = nn.CrossEntropyLoss()
     lr = args.lr
-    optimizer = torch.optim.SGD(model.parameters(), lr)
     best_val_loss = None
     
     # At any point you can hit Ctrl + C to break out of training early.
     if not args.test:
         try:
+            optimizer = torch.optim.SGD(model.parameters(), lr)
             files = os.listdir(args.lm_data)
             files = sorted(files)
             train_files = []
@@ -415,19 +415,21 @@ if __name__ == '__main__':
                     valid_files.append(file)
             print('Start training!!!')
             for epoch in range(1, args.epochs+1):
-                train_fname = random.choice(train_files)
                 valid_fname = random.choice(valid_files)
-                corpus = data.SentenceCorpus(args.bptt, args.lm_data, args.tag_data, 
-                                             word2idx, tag2idx, idx2word, idx2tag,
-                                             train_fname, valid_fname, None, testflag=args.test)
-
-                train_lm_data = batchify(corpus.train_lm, args.batch_size)
-                val_lm_data = batchify(corpus.valid_lm, args.batch_size)
-                train_ccg_data = batchify(corpus.train_tag, args.batch_size)
-                val_ccg_data = batchify(corpus.valid_tag, args.batch_size)
+                for train_fname in train_files:
+                    train_fname = random.choice(train_files)
+                    corpus = data.SentenceCorpus(args.bptt, args.lm_data, args.tag_data, 
+                                                 word2idx, tag2idx, idx2word, idx2tag,
+                                                 train_fname, valid_fname, None, testflag=args.test)
+    
+                    train_lm_data = batchify(corpus.train_lm, args.batch_size)
+                    train_ccg_data = batchify(corpus.train_tag, args.batch_size)
                     
-                epoch_start_time = time.time()
-                train(args, train_lm_data, train_ccg_data, criterion, optimizer)
+                    epoch_start_time = time.time()
+                    train(args, train_lm_data, train_ccg_data, criterion, optimizer)
+                    
+                val_lm_data = batchify(corpus.valid_lm, args.batch_size)
+                val_ccg_data = batchify(corpus.valid_tag, args.batch_size)
                 val_loss = evaluate(args, val_lm_data, val_ccg_data)
                 print('-' * 89)
                 print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} '.format(epoch, 

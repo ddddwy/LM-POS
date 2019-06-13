@@ -333,7 +333,7 @@ if __name__ == '__main__':
                         help='number of hidden units per layer')
     parser.add_argument('--nlayers', type=int, default=2,
                         help='number of layers')
-    parser.add_argument('--lr', type=float, default=20,
+    parser.add_argument('--lr', type=float, default=0.01,
                         help='initial learning rate')
     parser.add_argument('--clip', type=float, default=0.25,
                         help='gradient clipping')
@@ -398,8 +398,8 @@ if __name__ == '__main__':
             model.cuda()
     
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters())
     lr = args.lr
+    optimizer = torch.optim.SGD(model.parameters(), lr)
     best_val_loss = None
     
     # At any point you can hit Ctrl + C to break out of training early.

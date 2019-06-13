@@ -187,7 +187,7 @@ def test_get_batch(sent_ids, tag_ids, evaluation=True):
     else:
         return input_token, output_token, input_tag, output_tag
 
-def test_evaluate(args, test_lm_sentences, lm_data_source, ccg_data_source):
+def test_evaluate(args, model, test_lm_sentences, lm_data_source, ccg_data_source):
     # Turn on evaluation mode which disables dropout.
     model.eval()
     total_loss = 0.
@@ -210,8 +210,9 @@ def test_evaluate(args, test_lm_sentences, lm_data_source, ccg_data_source):
         if args.cuda:
             sent_ids = sent_ids.cuda()
             tag_ids = tag_ids.cuda()
-        hidden = model.init_hidden(1) # number of parallel sentences being processed
-        
+            
+        hidden_word = model.init_hidden(1)
+        hidden_tag = model.init_hidden(1)
         input_tokens, output_tokens, input_tags, output_tags = test_get_batch(sent_ids, tag_ids, evaluation=True)
         input_tokens = input_tokens.unsqueeze(1)  # [seq_len, 1] 
         input_tags = input_tags.unsqueeze(1)  # [seq_len, 1]
@@ -220,7 +221,11 @@ def test_evaluate(args, test_lm_sentences, lm_data_source, ccg_data_source):
         for t in range(min(args.bptt-1, train_lm_data.size(0)-1)):
             input_token = input_tokens[t].unsqueeze(0) # [1, 1]
             input_tag = input_tags[t].unsqueeze(0) # [1, 1]
-            p_word, p_tag, hidden = model(input_token, input_tag, hidden) # p_word = [1, ntoken]
+            if args.rnn_num == 1:
+                # p_word = [1, ntoken]
+                p_word, p_tag, hidden_word = model(input_token, input_tag, hidden_word)
+            else:
+                p_word, p_tag, hidden_word, hidden_tag = model(input_token, input_tag, hidden_word, hidden_tag)
             word_loss = criterion(p_word, output_tokens[t])
             tag_loss = criterion(p_tag, output_tags[t])
             curr_loss += word_loss + tag_loss
@@ -234,16 +239,18 @@ def test_evaluate(args, test_lm_sentences, lm_data_source, ccg_data_source):
             # output sentence-level loss
             print(str(sent)+":"+str(curr_loss))
         '''
-        hidden = repackage_hidden(hidden)
+        hidden_word = repackage_hidden(hidden_word)
+        hidden_tag = repackage_hidden(hidden_tag)
         bar.next()
     bar.finish()
     return total_loss / len(lm_data_source)
 
-def evaluate(args, valid_lm_data, valid_ccg_data):
+def evaluate(args, model, valid_lm_data, valid_ccg_data):
     # Turn on evaluation mode which disables dropout.
     model.eval()
     total_loss = 0
-    hidden = model.init_hidden(args.batch_size)
+    hidden_word = model.init_hidden(args.batch_size)
+    hidden_tag = model.init_hidden(args.batch_size)
         
     for i in range(0, valid_lm_data.size(1), args.batch_size):
         if (i+1)*args.batch_size > valid_lm_data.size(1):
@@ -254,21 +261,28 @@ def evaluate(args, valid_lm_data, valid_ccg_data):
         for t in range(min(args.bptt-1, train_lm_data.size(0)-1)):
             input_token = input_tokens[t].unsqueeze(0)
             input_tag = input_tags[t].unsqueeze(0)
-            p_word, p_tag, hidden = model(input_token, input_tag, hidden) # p_word = [batch_size, ntoken]
+            if args.rnn_num == 1:
+                # p_word = [batch_size, ntoken]
+                p_word, p_tag, hidden_word = model(input_token, input_tag, hidden_word) 
+            else:
+                p_word, p_tag, hidden_word, hidden_tag = model(input_token, input_tag, hidden_word, hidden_tag)
             word_loss = criterion(p_word, output_tokens[t])
             tag_loss = criterion(p_tag, output_tags[t])
             batch_loss += word_loss + tag_loss
         
         total_loss += float(batch_loss)
-        hidden = repackage_hidden(hidden)
+        
+        hidden_word = repackage_hidden(hidden_word)
+        hidden_tag = repackage_hidden(hidden_tag)
     return total_loss / valid_lm_data.size(1)
 
-def train(args, train_lm_data, train_ccg_data, criterion, optimizer):
+def train(args, model, train_lm_data, train_ccg_data, criterion, optimizer):
     # Turn on training mode which enables dropout.
     model.train()
     total_loss = 0
     start_time = time.time()
-    hidden = model.init_hidden(args.batch_size)
+    hidden_word = model.init_hidden(args.batch_size)
+    hidden_tag = model.init_hidden(args.batch_size)
 
     order = list(enumerate(range(0, train_lm_data.size(1), args.batch_size)))
     for batch, i in order:
@@ -278,13 +292,18 @@ def train(args, train_lm_data, train_ccg_data, criterion, optimizer):
             
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
-        hidden = repackage_hidden(hidden)
+        hidden_word = repackage_hidden(hidden_word)
+        hidden_tag = repackage_hidden(hidden_tag)
         optimizer.zero_grad()
         batch_loss = 0
         for t in range(min(args.bptt-1, train_lm_data.size(0)-1)):
             input_token = input_tokens[t].unsqueeze(0)  # [1, batch_size]
             input_tag = input_tags[t].unsqueeze(0)  # [1, batch_size]
-            p_word, p_tag, hidden = model(input_token, input_tag, hidden) # p_word = [batch_size, ntoken]
+            if args.rnn_num == 1:
+                # p_word = [batch_size, ntoken]
+                p_word, p_tag, hidden_word = model(input_token, input_tag, hidden_word)
+            else:
+                p_word, p_tag, hidden_word, hidden_tag = model(input_token, input_tag, hidden_word, hidden_tag)
             word_loss = criterion(p_word, output_tokens[t])
             tag_loss = criterion(p_tag, output_tags[t])
             batch_loss += word_loss + tag_loss
@@ -325,15 +344,17 @@ if __name__ == '__main__':
                         help='location of the language modeling corpus')
     parser.add_argument('--tag_data', type=str, default='../data/tag',
                         help='location of the CCG corpus')
+    parser.add_argument('--rnn_num', type=int, default=1,
+                        help='number of recurrent net')
     parser.add_argument('--model', type=str, default='LSTM',
                         help='type of recurrent net (RNN_TANH, RNN_RELU, LSTM, GRU)')
-    parser.add_argument('--emsize', type=int, default=200,
+    parser.add_argument('--emsize', type=int, default=100,
                         help='size of word embeddings')
     parser.add_argument('--nhid', type=int, default=200,
                         help='number of hidden units per layer')
     parser.add_argument('--nlayers', type=int, default=2,
                         help='number of layers')
-    parser.add_argument('--lr', type=float, default=0.01,
+    parser.add_argument('--lr', type=float, default=0.0001,
                         help='initial learning rate')
     parser.add_argument('--clip', type=float, default=0.25,
                         help='gradient clipping')
@@ -391,7 +412,10 @@ if __name__ == '__main__':
         print('Number of unique words:', ntokens)
         print('Number of unique tags:', ntags)
         print('Build model!!!')
-        model = model.RNNModel(args.model, ntokens, ntags, args.emsize, args.nhid, args.nlayers, args.dropout)
+        if args.rnn_num == 1:
+            model = model.RNNModel(args.model, ntokens, ntags, args.emsize, args.nhid, args.nlayers, args.dropout)
+        else:
+            model = model.MultiRNNModel(args.model, ntokens, ntags, args.emsize, args.nhid, args.nlayers, args.dropout)
         if args.cuda:
             model.cuda()
     
@@ -426,11 +450,11 @@ if __name__ == '__main__':
                     train_ccg_data = batchify(corpus.train_tag, args.batch_size)
                     
                     epoch_start_time = time.time()
-                    train(args, train_lm_data, train_ccg_data, criterion, optimizer)
+                    train(args, model, train_lm_data, train_ccg_data, criterion, optimizer)
                     
                     val_lm_data = batchify(corpus.valid_lm, args.batch_size)
                     val_ccg_data = batchify(corpus.valid_tag, args.batch_size)
-                    val_loss = evaluate(args, val_lm_data, val_ccg_data)
+                    val_loss = evaluate(args, model, val_lm_data, val_ccg_data)
                     print('-' * 89)
                     print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} '.format(epoch, 
                           (time.time() - epoch_start_time), val_loss))
@@ -466,7 +490,7 @@ if __name__ == '__main__':
             test_ccg_data = corpus.test_tag
             
             # Run on test data.
-            test_loss += test_evaluate(args, test_lm_sentences, test_lm_data, test_ccg_data)
+            test_loss += test_evaluate(args, model, test_lm_sentences, test_lm_data, test_ccg_data)
         print('=' * 89)
         print('| End of testing | test loss {:5.2f} '.format(test_loss))
         print('=' * 89)

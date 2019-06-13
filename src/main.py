@@ -263,7 +263,7 @@ def evaluate(args, valid_lm_data, valid_ccg_data):
         hidden = repackage_hidden(hidden)
     return total_loss / valid_lm_data.size(1)
 
-def train(args, train_lm_data, train_ccg_data):
+def train(args, train_lm_data, train_ccg_data, criterion, optimizer):
     # Turn on training mode which enables dropout.
     model.train()
     total_loss = 0
@@ -279,7 +279,7 @@ def train(args, train_lm_data, train_ccg_data):
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
         hidden = repackage_hidden(hidden)
-        model.zero_grad()
+        optimizer.zero_grad()
         batch_loss = 0
         for t in range(min(args.bptt-1, train_lm_data.size(0)-1)):
             input_token = input_tokens[t].unsqueeze(0)  # [1, batch_size]
@@ -292,8 +292,7 @@ def train(args, train_lm_data, train_ccg_data):
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
-        for p in model.parameters():
-            p.data.add_(-lr, p.grad.data)
+        optimizer.step()
 
         total_loss += batch_loss.item()
 
@@ -399,6 +398,7 @@ if __name__ == '__main__':
             model.cuda()
     
     criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model.parameters())
     lr = args.lr
     best_val_loss = None
     
@@ -430,7 +430,7 @@ if __name__ == '__main__':
                 val_ccg_data = batchify(corpus.valid_tag, args.batch_size)
                     
                 epoch_start_time = time.time()
-                train(args, train_lm_data, train_ccg_data)
+                train(args, train_lm_data, train_ccg_data, criterion, optimizer)
                 val_loss = evaluate(args, val_lm_data, val_ccg_data)
                 print('-' * 89)
                 print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} '.format(epoch, 
@@ -441,9 +441,6 @@ if __name__ == '__main__':
                     with open(args.save, 'wb') as f:
                         torch.save(model, f)
                         best_val_loss = val_loss
-                else:
-                    # Anneal the learning rate if no improvement has been seen in the validation dataset.
-                    lr /= 4.0
         except KeyboardInterrupt:
             print('-' * 89)
             print('Exiting from training early')

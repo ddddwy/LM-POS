@@ -353,8 +353,6 @@ if __name__ == '__main__':
                         help='report interval')
     parser.add_argument('--save', type=str,  default='../models/model.pt',
                         help='path to save the final model')
-    parser.add_argument('--save_lm_data', type=str, default='../models/lm_data.bin',
-                        help='path to save the LM data')
     parser.add_argument('--test', action='store_true',
                         help='test a trained LM')
     parser.add_argument('--guess', action='store_true',
@@ -421,8 +419,7 @@ if __name__ == '__main__':
                 valid_fname = random.choice(valid_files)
                 corpus = data.SentenceCorpus(args.bptt, args.lm_data, args.tag_data, 
                                              word2idx, tag2idx, idx2word, idx2tag,
-                                             train_fname, valid_fname, None,
-                                             save_to=args.save_lm_data, testflag=args.test)
+                                             train_fname, valid_fname, None, testflag=args.test)
 
                 train_lm_data = batchify(corpus.train_lm, args.batch_size)
                 val_lm_data = batchify(corpus.valid_lm, args.batch_size)
@@ -461,8 +458,7 @@ if __name__ == '__main__':
         for test_fname in test_files:
             corpus = data.SentenceCorpus(args.bptt, args.lm_data, args.tag_data, 
                                          word2idx, tag2idx, idx2word, idx2tag,
-                                         None, None, test_fname,
-                                         save_to=args.save_lm_data, testflag=args.test)
+                                         None, None, test_fname, testflag=args.test)
             
             test_lm_sentences, test_lm_data = corpus.test_lm
             test_ccg_data = corpus.test_tag

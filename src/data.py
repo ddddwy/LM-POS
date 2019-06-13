@@ -124,7 +124,7 @@ class SentenceCorpus(object):
             ids[i, 0] = self.word2idx['<sos>']
             for j, word in enumerate(words[:self.seq_len-1]):
                 if word not in self.word2idx:
-                    ids[i, j+1] = self.word2idx("<unk>")
+                    ids[i, j+1] = self.word2idx["<unk>"]
                 else:
                     ids[i, j+1] = self.word2idx[word]
             if j+1 < self.seq_len-1:
@@ -149,7 +149,7 @@ class SentenceCorpus(object):
             ids[0] = self.word2idx['<sos>']
             for j, word in enumerate(words):
                 if word not in self.word2idx:
-                    ids[j+1] = self.word2idx("<unk>")
+                    ids[j+1] = self.word2idx["<unk>"]
                 else:
                     ids[j+1] = self.word2idx[word]
             ids[j+2] = self.word2idx['<eos>']

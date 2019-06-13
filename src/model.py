@@ -67,7 +67,7 @@ class RNNModel(nn.Module):
 
 class MultiRNNModel(nn.Module):
     def __init__(self, rnn_type, ntoken, ntag, ninp, nhid, nlayers, dropout=0.5):
-        super(RNNModel, self).__init__()
+        super(MultiRNNModel, self).__init__()
         self.drop = nn.Dropout(dropout)
         self.word_emb = nn.Embedding(ntoken, ninp)
         self.tag_emb = nn.Embedding(ntag, ninp)

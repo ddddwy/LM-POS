@@ -336,7 +336,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='PyTorch RNN/LSTM language modeling and CCG tagging multitask model')
     
-    parser.add_argument('--vocab_path', type=str, default='../data/vocab.txt',
+    parser.add_argument('--vocab_path', type=str, default='../data/vocab_50k.txt',
                         help='location of the language modeling corpus')
     parser.add_argument('--tag_path', type=str, default='../data/tag.txt',
                         help='location of the CCG corpus')

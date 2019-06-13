@@ -282,8 +282,8 @@ def train(args, train_lm_data, train_ccg_data):
         model.zero_grad()
         batch_loss = 0
         for t in range(min(args.bptt-1, train_lm_data.size(0)-1)):
-            input_token = input_tokens[t].unsqueeze(1)  # [batch_size, 1]
-            input_tag = input_tags[t].unsqueeze(1)  # [batch_size, 1]
+            input_token = input_tokens[t].unsqueeze(0)  # [1, batch_size]
+            input_tag = input_tags[t].unsqueeze(0)  # [1, batch_size]
             p_word, p_tag, hidden = model(input_token, input_tag, hidden) # p_word = [batch_size, ntoken]
             word_loss = criterion(p_word, output_tokens[t])
             tag_loss = criterion(p_tag, output_tags[t])

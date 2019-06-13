@@ -2,10 +2,8 @@ import os
 import torch
 
 class SentenceCorpus(object):
-    def __init__(self, seq_len, lm_path, tag_path, 
-                 word2idx, tag2idx, idx2word, idx2tag,
-                 train_fname, valid_fname, test_fname,
-                 save_to='lm_data.bin', testflag=False):
+    def __init__(self, seq_len, lm_path, tag_path, word2idx, tag2idx, idx2word, idx2tag,
+                 train_fname, valid_fname, test_fname, testflag=False):
         self.seq_len = seq_len
         self.word2idx = word2idx
         self.tag2idx = tag2idx

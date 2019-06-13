@@ -349,7 +349,7 @@ if __name__ == '__main__':
                         help='random seed')
     parser.add_argument('--cuda', action='store_true',
                         help='use CUDA')
-    parser.add_argument('--log_interval', type=int, default=1000, metavar='N',
+    parser.add_argument('--log_interval', type=int, default=500, metavar='N',
                         help='report interval')
     parser.add_argument('--save', type=str,  default='../models/model.pt',
                         help='path to save the final model')
@@ -428,18 +428,18 @@ if __name__ == '__main__':
                     epoch_start_time = time.time()
                     train(args, train_lm_data, train_ccg_data, criterion, optimizer)
                     
-                val_lm_data = batchify(corpus.valid_lm, args.batch_size)
-                val_ccg_data = batchify(corpus.valid_tag, args.batch_size)
-                val_loss = evaluate(args, val_lm_data, val_ccg_data)
-                print('-' * 89)
-                print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} '.format(epoch, 
-                      (time.time() - epoch_start_time), val_loss))
-                print('-' * 89)
-                # Save the model if the validation loss is the best we've seen so far.
-                if not best_val_loss or val_loss < best_val_loss:
-                    with open(args.save, 'wb') as f:
-                        torch.save(model, f)
-                        best_val_loss = val_loss
+                    val_lm_data = batchify(corpus.valid_lm, args.batch_size)
+                    val_ccg_data = batchify(corpus.valid_tag, args.batch_size)
+                    val_loss = evaluate(args, val_lm_data, val_ccg_data)
+                    print('-' * 89)
+                    print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} '.format(epoch, 
+                          (time.time() - epoch_start_time), val_loss))
+                    print('-' * 89)
+                    # Save the model if the validation loss is the best we've seen so far.
+                    if not best_val_loss or val_loss < best_val_loss:
+                        with open(args.save, 'wb') as f:
+                            torch.save(model, f)
+                            best_val_loss = val_loss
         except KeyboardInterrupt:
             print('-' * 89)
             print('Exiting from training early')

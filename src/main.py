@@ -226,7 +226,10 @@ def test_evaluate(args, model, test_lm_sentences, lm_data_source, ccg_data_sourc
                 input_tag = input_tags[t].unsqueeze(0) # [1, 1]
                 if args.rnn_num == 1:
                     # p_word = [1, ntoken]
-                    p_word, p_tag, hidden_word = model(input_token, input_tag, hidden_word)
+                    if args.lm:
+                        p_word, hidden_word = model(input_token, hidden_word)
+                    else:
+                        p_word, p_tag, hidden_word = model(input_token, input_tag, hidden_word)
                 else:
                     p_word, p_tag, hidden_word, hidden_tag = model(input_token, input_tag, hidden_word, hidden_tag)
                 word_loss = criterion(p_word, output_tokens[t])
@@ -265,12 +268,18 @@ def evaluate(args, model, valid_lm_data, valid_ccg_data):
             input_tag = input_tags[t].unsqueeze(0)
             if args.rnn_num == 1:
                 # p_word = [batch_size, ntoken]
-                p_word, p_tag, hidden_word = model(input_token, input_tag, hidden_word) 
+                if args.lm:
+                    p_word, hidden_word = model(input_token, hidden_word)
+                else:
+                    p_word, p_tag, hidden_word = model(input_token, input_tag, hidden_word) 
             else:
                 p_word, p_tag, hidden_word, hidden_tag = model(input_token, input_tag, hidden_word, hidden_tag)
             word_loss = criterion(p_word, output_tokens[t])
-            tag_loss = criterion(p_tag, output_tags[t])
-            batch_loss += word_loss + tag_loss
+            if args.lm:
+                batch_loss += word_loss
+            else:
+                tag_loss = criterion(p_tag, output_tags[t])
+                batch_loss += word_loss + tag_loss
         
         total_loss += float(batch_loss)
         
@@ -303,12 +312,18 @@ def train(args, model, train_lm_data, train_ccg_data, criterion, optimizer):
             input_tag = input_tags[t].unsqueeze(0)  # [1, batch_size]
             if args.rnn_num == 1:
                 # p_word = [batch_size, ntoken]
-                p_word, p_tag, hidden_word = model(input_token, input_tag, hidden_word)
+                if args.lm:
+                    p_word, hidden_word = model(input_token, hidden_word)
+                else:
+                    p_word, p_tag, hidden_word = model(input_token, input_tag, hidden_word)
             else:
                 p_word, p_tag, hidden_word, hidden_tag = model(input_token, input_tag, hidden_word, hidden_tag)
             word_loss = criterion(p_word, output_tokens[t])
-            tag_loss = criterion(p_tag, output_tags[t])
-            batch_loss += word_loss + tag_loss
+            if args.lm:
+                batch_loss += word_loss
+            else:
+                tag_loss = criterion(p_tag, output_tags[t])
+                batch_loss += word_loss + tag_loss
         batch_loss.backward()
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.

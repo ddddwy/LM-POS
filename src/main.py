@@ -191,7 +191,6 @@ def test_get_batch(sent_ids, tag_ids):
 def test_evaluate(args, model, test_lm_sentences, lm_data_source, ccg_data_source):
     # Turn on evaluation mode which disables dropout.
     model.eval()
-    total_loss = 0.
     '''
     if args.words:
         print('word sentid sentpos wlen surp entropy')#,end='')
@@ -202,7 +201,7 @@ def test_evaluate(args, model, test_lm_sentences, lm_data_source, ccg_data_sourc
                     print(' gscore'+str(i))#,end='')
         sys.stdout.write('\n')
     '''
-    
+    total_loss = 0.
     bar = Bar('Processing', max=len(lm_data_source))
     for i in range(len(lm_data_source)):
         sent = test_lm_sentences[i]
@@ -231,10 +230,11 @@ def test_evaluate(args, model, test_lm_sentences, lm_data_source, ccg_data_sourc
                 else:
                     p_word, p_tag, hidden_word, hidden_tag = model(input_token, input_tag, hidden_word, hidden_tag)
                 word_loss = criterion(p_word, output_tokens[t])
-                tag_loss = criterion(p_tag, output_tags[t])
-                curr_loss += word_loss + tag_loss
-            
-            total_loss += float(curr_loss)
+#                tag_loss = criterion(p_tag, output_tags[t])
+#                curr_loss += word_loss + tag_loss
+                curr_loss += word_loss
+            seq_len = min(sent_ids.size(0), tag_ids.size(0))
+            total_loss += float(curr_loss)/seq_len
             '''
             if args.words:
                 # output word-level complexity metrics

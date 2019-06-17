@@ -366,7 +366,7 @@ if __name__ == '__main__':
                         help='gradient clipping')
     parser.add_argument('--epochs', type=int, default=40,
                         help='upper epoch limit')
-    parser.add_argument('--batch_size', type=int, default=4, metavar='N',
+    parser.add_argument('--batch_size', type=int, default=16, metavar='N',
                         help='batch size')
     parser.add_argument('--bptt', type=int, default=35,
                         help='sequence length')
@@ -376,7 +376,7 @@ if __name__ == '__main__':
                         help='random seed')
     parser.add_argument('--cuda', action='store_true',
                         help='use CUDA')
-    parser.add_argument('--log_interval', type=int, default=500, metavar='N',
+    parser.add_argument('--log_interval', type=int, default=125, metavar='N',
                         help='report interval')
     parser.add_argument('--save', type=str,  default='../models/model.pt',
                         help='path to save the final model')

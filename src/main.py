@@ -423,7 +423,7 @@ if __name__ == '__main__':
                 model =  model.SimpleLMModel(args.model, ntokens, args.emsize, args.nhid, args.nlayers, args.dropout)
             if args.simple:
                 model =  model.SimpleRNNModel(args.model, ntokens, ntags, args.emsize, args.nhid, args.nlayers, args.dropout)
-            if not args.simple:
+            if not args.simple and not args.lm:
                 model = model.RNNModel(args.model, ntokens, ntags, args.emsize, args.nhid, args.nlayers, args.dropout)
         else:
             if args.simple:

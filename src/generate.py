@@ -1,37 +1,23 @@
-###############################################################################
-# Language Modeling on Penn Tree Bank
-#
-# This file generates new sentences sampled from the language model
-#
-###############################################################################
-
 import argparse
 import os
 import torch
 from torch.autograd import Variable
-import data
 from main import build_dictionary
 
-parser = argparse.ArgumentParser(description='PyTorch PTB Language Model')
+parser = argparse.ArgumentParser(description='Language Model')
 
 # Model parameters.
 parser.add_argument('--vocab_path', type=str, default='../data/vocab.txt',
                     help='location of the language modeling corpus')
 parser.add_argument('--tag_path', type=str, default='../data/tag.txt',
                     help='location of the CCG corpus')
-parser.add_argument('--lm_path', type=str, default='../data/txt',
-                    help='location of the data corpus')
-parser.add_argument('--tag_path', type=str, default='../data/tag',
-                    help='location of the tag corpus')
 parser.add_argument('--seq_len', type=int, default=35,
                     help='max seqence length')
 parser.add_argument('--checkpoint', type=str, default='../models/model.pt',
                     help='model checkpoint to use')
-parser.add_argument('--lm_data', type=str, default='/models/lm_data.bin',
-                    help='path to load the LM data')
 parser.add_argument('--outf', type=str, default='../results/generated.txt',
                     help='output file for generated text')
-parser.add_argument('--words', type=int, default='1000',
+parser.add_argument('--words', type=int, default=10000,
                     help='number of words to generate')
 parser.add_argument('--seed', type=int, default=1234,
                     help='random seed')

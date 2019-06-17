@@ -49,31 +49,33 @@ word2idx, tag2idx, idx2word, idx2tag = build_dictionary(args.vocab_path, args.ta
 # Load model from checkpoint
 with open(args.checkpoint, 'rb') as f:
     model = torch.load(f)
+
 model.eval()
 if args.cuda:
     model.cuda()
 else:
     model.cpu()
 
-# Initialize model inputs
-hidden = model.init_hidden(1)
-input_token = Variable(torch.ones(1, 1).long(), volatile=True)
-input_tag = Variable(torch.ones(1, 1).long(), volatile=True)
-if args.cuda:
-    input_token = input_token.cuda()
-    input_tag = input_tag.cuda()
-
-with open(args.outf, 'w') as outf:
-    for i in range(args.words):
-        p_word, p_tag, hidden = model(input_token, input_tag, hidden)
-        word_idx = torch.argmax(p_word.squeeze())
-        tag_idx = torch.argmax(p_tag.squeeze())
-        input_token.data.fill_(word_idx)
-        word = idx2word[word_idx]
-        input_tag.data.fill_(tag_idx)
-        tag = idx2word[tag_idx]
-
-        outf.write(word + ('\n' if i % 20 == 19 else ' '))
-
-        if i % args.log_interval == 0:
-            print('| Generated {}/{} words'.format(i, args.words))
+with torch.no_grad():
+    # Initialize model inputs
+    hidden = model.init_hidden(1)
+    input_token = Variable(3*torch.ones(1, 1).long())
+    input_tag = Variable(3*torch.ones(1, 1).long())
+    if args.cuda:
+        input_token = input_token.cuda()
+        input_tag = input_tag.cuda()
+    
+    with open(args.outf, 'w') as outf:
+        for i in range(args.words):
+            p_word, p_tag, hidden = model(input_token, input_tag, hidden)
+            word_idx = torch.multinomial(p_word.squeeze(), 1)
+            tag_idx = torch.multinomial(p_tag.squeeze(), 1)
+            input_token.data.fill_(word_idx)
+            word = idx2word[word_idx]
+            input_tag.data.fill_(tag_idx)
+            tag = idx2word[tag_idx]
+    
+            outf.write(word + ('\n' if i % 20 == 19 else ' '))
+    
+            if i % args.log_interval == 0:
+                print('| Generated {}/{} words'.format(i, args.words))

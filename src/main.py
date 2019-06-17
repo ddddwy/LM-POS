@@ -219,7 +219,7 @@ def test_evaluate(args, model, test_lm_sentences, lm_data_source, ccg_data_sourc
         input_tags = input_tags.unsqueeze(1)  # [seq_len, 1]
         
         curr_loss = 0
-        for t in range(min(args.bptt-1, lm_data_source.size(0)-1)):
+        for t in range(args.bptt-1):
             input_token = input_tokens[t].unsqueeze(0) # [1, 1]
             input_tag = input_tags[t].unsqueeze(0) # [1, 1]
             if args.rnn_num == 1:

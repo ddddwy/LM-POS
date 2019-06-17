@@ -497,9 +497,10 @@ if __name__ == '__main__':
             test_ccg_data = corpus.test_tag
             
             # Run on test data.
-            test_loss += test_evaluate(args, model, test_lm_sentences, test_lm_data, test_ccg_data)
+            curr_loss = test_evaluate(args, model, test_lm_sentences, test_lm_data, test_ccg_data)
+            test_loss += curr_loss
+            print('| End of testing | test loss {:5.2f} '.format(curr_loss))
         test_loss = test_loss / len(test_files)
         print('=' * 89)
-        print('| End of testing | test loss {:5.2f} '.format(test_loss))
         print('| End of testing | test loss {:5.2f} | test ppl {:8.2f}'.format(test_loss, np.power(2, test_loss)))
         print('=' * 89)

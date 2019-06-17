@@ -176,11 +176,11 @@ def get_batch(lm_data, tag_data, i, evaluation=False):
     else:
         return input_token, output_token, input_tag, output_tag
 
-def test_get_batch(sent_ids, tag_ids, evaluation=True):
+def test_get_batch(sent_ids, tag_ids):
     seq_len = sent_ids.size(0)
-    input_token = Variable(sent_ids[:seq_len-1], volatile=evaluation)
+    input_token = Variable(sent_ids[:seq_len-1])
     output_token = Variable(sent_ids[1:seq_len])
-    input_tag = Variable(tag_ids[:seq_len-1], volatile=evaluation)
+    input_tag = Variable(tag_ids[:seq_len-1])
     output_tag = Variable(tag_ids[1:seq_len])
     # This is where data should be CUDA-fied to lessen OOM errors
     if args.cuda:
@@ -212,36 +212,39 @@ def test_evaluate(args, model, test_lm_sentences, lm_data_source, ccg_data_sourc
             sent_ids = sent_ids.cuda()
             tag_ids = tag_ids.cuda()
             
-        hidden_word = model.init_hidden(1)
-        hidden_tag = model.init_hidden(1)
-        input_tokens, output_tokens, input_tags, output_tags = test_get_batch(sent_ids, tag_ids, evaluation=True)
-        input_tokens = input_tokens.unsqueeze(1)  # [seq_len, 1] 
-        input_tags = input_tags.unsqueeze(1)  # [seq_len, 1]
-        
-        curr_loss = 0
-        for t in range(args.bptt-1):
-            input_token = input_tokens[t].unsqueeze(0) # [1, 1]
-            input_tag = input_tags[t].unsqueeze(0) # [1, 1]
-            if args.rnn_num == 1:
-                # p_word = [1, ntoken]
-                p_word, p_tag, hidden_word = model(input_token, input_tag, hidden_word)
+        with torch.no_grad():
+            hidden_word = model.init_hidden(1)
+            hidden_tag = model.init_hidden(1)
+            input_tokens, output_tokens, input_tags, output_tags = test_get_batch(sent_ids, tag_ids)
+            input_tokens = input_tokens.unsqueeze(1)  # [seq_len, 1] 
+            input_tags = input_tags.unsqueeze(1)  # [seq_len, 1]
+            output_tokens = output_tokens.unsqueeze(1)  # [seq_len, 1]
+            output_tags = output_tags.unsqueeze(1)  # [seq_len, 1]
+            
+            curr_loss = 0
+            for t in range(min(sent_ids.size(0)-1, tag_ids.size(0)-1)):
+                input_token = input_tokens[t].unsqueeze(0) # [1, 1]
+                input_tag = input_tags[t].unsqueeze(0) # [1, 1]
+                if args.rnn_num == 1:
+                    # p_word = [1, ntoken]
+                    p_word, p_tag, hidden_word = model(input_token, input_tag, hidden_word)
+                else:
+                    p_word, p_tag, hidden_word, hidden_tag = model(input_token, input_tag, hidden_word, hidden_tag)
+                word_loss = criterion(p_word, output_tokens[t])
+                tag_loss = criterion(p_tag, output_tags[t])
+                curr_loss += word_loss + tag_loss
+            
+            total_loss += float(curr_loss)
+            '''
+            if args.words:
+                # output word-level complexity metrics
+                get_complexity_apply(output_flat, output_token, i, tags=True)
             else:
-                p_word, p_tag, hidden_word, hidden_tag = model(input_token, input_tag, hidden_word, hidden_tag)
-            word_loss = criterion(p_word, output_tokens[t])
-            tag_loss = criterion(p_tag, output_tags[t])
-            curr_loss += word_loss + tag_loss
-        
-        total_loss += float(curr_loss)
-        '''
-        if args.words:
-            # output word-level complexity metrics
-            get_complexity_apply(output_flat, output_token, i, tags=True)
-        else:
-            # output sentence-level loss
-            print(str(sent)+":"+str(curr_loss))
-        '''
-        hidden_word = repackage_hidden(hidden_word)
-        hidden_tag = repackage_hidden(hidden_tag)
+                # output sentence-level loss
+                print(str(sent)+":"+str(curr_loss))
+            '''
+            hidden_word = repackage_hidden(hidden_word)
+            hidden_tag = repackage_hidden(hidden_tag)
         bar.next()
     bar.finish()
     return total_loss / len(lm_data_source)
@@ -471,7 +474,10 @@ if __name__ == '__main__':
     else:
         # Load the best saved model.
         with open(args.save, 'rb') as f:
-            model = torch.load(f)
+            if args.cuda:
+                model = torch.load(f)
+            else:
+                model = torch.load(f, map_location='cpu')
         
         files = os.listdir(args.lm_data)
         files = sorted(files)

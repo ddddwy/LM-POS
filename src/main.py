@@ -230,8 +230,6 @@ def test_evaluate(args, model, test_lm_sentences, lm_data_source, ccg_data_sourc
                 else:
                     p_word, p_tag, hidden_word, hidden_tag = model(input_token, input_tag, hidden_word, hidden_tag)
                 word_loss = criterion(p_word, output_tokens[t])
-#                tag_loss = criterion(p_tag, output_tags[t])
-#                curr_loss += word_loss + tag_loss
                 curr_loss += word_loss
             seq_len = min(sent_ids.size(0), tag_ids.size(0))
             total_loss += float(curr_loss)/seq_len
@@ -350,6 +348,10 @@ if __name__ == '__main__':
                         help='location of the CCG corpus')
     parser.add_argument('--rnn_num', type=int, default=1,
                         help='number of recurrent net')
+    parser.add_argument('--simple', action='store_true',
+                        help='use simple model')
+    parser.add_argument('--lm', action='store_true',
+                        help='use lm model')
     parser.add_argument('--model', type=str, default='LSTM',
                         help='type of recurrent net (RNN_TANH, RNN_RELU, LSTM, GRU)')
     parser.add_argument('--emsize', type=int, default=100,
@@ -417,9 +419,17 @@ if __name__ == '__main__':
         print('Number of unique tags:', ntags)
         print('Build model!!!')
         if args.rnn_num == 1:
-            model = model.RNNModel(args.model, ntokens, ntags, args.emsize, args.nhid, args.nlayers, args.dropout)
+            if args.lm:
+                model =  model.SimpleLMModel(args.model, ntokens, args.emsize, args.nhid, args.nlayers, args.dropout)
+            if args.simple:
+                model =  model.SimpleRNNModel(args.model, ntokens, ntags, args.emsize, args.nhid, args.nlayers, args.dropout)
+            if not args.simple:
+                model = model.RNNModel(args.model, ntokens, ntags, args.emsize, args.nhid, args.nlayers, args.dropout)
         else:
-            model = model.MultiRNNModel(args.model, ntokens, ntags, args.emsize, args.nhid, args.nlayers, args.dropout)
+            if args.simple:
+                model = model.SimpleMultiRNNModel(args.model, ntokens, ntags, args.emsize, args.nhid, args.nlayers, args.dropout)
+            else:
+                model = model.MultiRNNModel(args.model, ntokens, ntags, args.emsize, args.nhid, args.nlayers, args.dropout)
         if args.cuda:
             model.cuda()
     

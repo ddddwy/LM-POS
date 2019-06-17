@@ -10,6 +10,7 @@ import data
 import model
 import os
 import random
+import numpy as np
 
 
 ###############################################################################
@@ -218,7 +219,7 @@ def test_evaluate(args, model, test_lm_sentences, lm_data_source, ccg_data_sourc
         input_tags = input_tags.unsqueeze(1)  # [seq_len, 1]
         
         curr_loss = 0
-        for t in range(min(args.bptt-1, train_lm_data.size(0)-1)):
+        for t in range(min(args.bptt-1, lm_data_source.size(0)-1)):
             input_token = input_tokens[t].unsqueeze(0) # [1, 1]
             input_tag = input_tags[t].unsqueeze(0) # [1, 1]
             if args.rnn_num == 1:
@@ -493,4 +494,5 @@ if __name__ == '__main__':
             test_loss += test_evaluate(args, model, test_lm_sentences, test_lm_data, test_ccg_data)
         print('=' * 89)
         print('| End of testing | test loss {:5.2f} '.format(test_loss))
+        print('| End of testing | test loss {:5.2f} | test ppl {:8.2f}'.format(test_loss, np.exp(test_loss)))
         print('=' * 89)

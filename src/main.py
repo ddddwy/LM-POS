@@ -186,7 +186,7 @@ def train(args, model, train_lm_data, train_masking, train_ccg_data, criterion, 
         if batch % args.log_interval == 0 and batch > 0:
             cur_loss = total_loss / args.log_interval
             elapsed = time.time() - start_time
-            print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:1.6f} | {:5.2f} ms/batch | '
+            print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:1.4f} | {:5.2f} ms/batch | '
                     'loss {:5.4f} '.format(epoch, batch, train_lm_data.size(1) // args.batch_size, 
                           lr, elapsed * 1000 / args.log_interval, cur_loss))
             total_loss = 0
@@ -344,7 +344,7 @@ if __name__ == '__main__':
                     val_ccg_data = batchify(corpus.valid_tag, args.batch_size)
                     val_loss = evaluate(args, model, val_lm_data, val_masking, val_ccg_data)
                     print('-' * 80)
-                    print('| end of %s | time: {:5.2f}s | valid loss {:5.4f} '.format(train_fname, 
+                    print('| end of {} | time: {:5.2f}s | valid loss {:5.4f} '.format(train_fname, 
                           (time.time() - epoch_start_time), val_loss))
                     print('-' * 80)
                     # Save the model if the validation loss is the best we've seen so far.

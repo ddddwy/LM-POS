@@ -130,7 +130,7 @@ def evaluate(args, model, valid_lm_data, valid_masking, valid_ccg_data):
         
         hidden_word = repackage_hidden(hidden_word)
         hidden_tag = repackage_hidden(hidden_tag)
-    return total_loss/valid_lm_data.size(1)
+    return total_loss/(valid_lm_data.size(1)//args.batch_size)
 
 def train(args, model, train_lm_data, train_masking, train_ccg_data, criterion, optimizer):
     # Turn on training mode which enables dropout.

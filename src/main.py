@@ -1,161 +1,18 @@
 import argparse
 import time
-import math
 import torch
 import torch.nn as nn
 import torch.onnx
 from torch.autograd import Variable
 from progress.bar import Bar
+from data import build_dictionary, batchify
 import data
 import model
 import os
 import random
 import numpy as np
+import tensorflow as tf
 
-
-###############################################################################
-# Load data
-###############################################################################
-
-def batchify(data, bsz):
-    # Work out how cleanly we can divide the dataset into bsz parts.
-    nbatch = data.size(0) // bsz
-    # Trim off any extra elements that wouldn't cleanly fit (remainders).
-    data = data.narrow(0, 0, nbatch * bsz)  # [nbatch * bsz, seq_len]
-    data = data.t()  # [seq_len, nbatch * bsz]
-    return data
-
-def build_dictionary(vocab_path, tag_path):
-    word2idx = {}
-    tag2idx = {}
-    idx2tag = []
-    idx2word = []
-    word2idx['<pad>'] = 0
-    tag2idx['<PAD>'] = 0
-    idx2word.append('<pad>')
-    idx2tag.append('<PAD>')
-    word2idx['<unk>'] = 1
-    tag2idx['<UNK>'] = 1
-    idx2word.append('<unk>')
-    idx2tag.append('<UNK>')
-    word2idx['<sos>'] = 2
-    tag2idx['<SOS>'] = 2
-    idx2word.append('<sos>')
-    idx2tag.append('<SOS>')
-    word2idx['<eos>'] = 3
-    tag2idx['<EOS>'] = 3
-    idx2word.append('<eos>')
-    idx2tag.append('<EOS>')
-
-    with open(vocab_path, 'r') as f:
-        words = f.read().split('\n')
-    for word in words:
-        word = word.strip()
-        if word not in word2idx:
-            idx2word.append(word)
-            word2idx[word] = len(idx2word) - 1
-
-    with open(tag_path, 'r') as f:
-        tags = f.read().split('\n')
-    for tag in tags:
-        tag = tag.strip()
-        if tag not in tag2idx:
-            idx2tag.append(tag)
-            tag2idx[tag] = len(idx2tag) - 1
-    
-    return word2idx, tag2idx, idx2word, idx2tag
-
-###############################################################################
-# Complexity measures
-###############################################################################
-
-def get_entropy(o):
-    ## o should be a vector scoring possible classes
-    probs = nn.functional.softmax(o,dim=0)
-    logprobs = nn.functional.log_softmax(o,dim=0) #numerically more stable than two separate operations
-    return -1 * torch.sum(probs * logprobs)
-
-def get_surps(o):
-    ## o should be a vector scoring possible classes
-    logprobs = nn.functional.log_softmax(o,dim=0)
-    return -1 * logprobs
-
-def get_guesses(o, scores=False):
-    ## o should be a vector scoring possible classes
-    guessvals, guessixes = torch.topk(o,args.guessn,0)
-    # guessvals are the scores of each input cell
-    # guessixes are the indices of the max cells
-    if scores:
-        return guessvals
-    else:
-        return guessixes
-
-def get_guessscores(o):
-    return get_guesses(o,True)
-
-def get_complexity_iter(o,t):
-    for corpuspos,targ in enumerate(t):
-        word = corpus.dictionary.idx2word[targ]
-        surp = get_surps(o[corpuspos])
-        H = get_entropy(o[corpuspos])
-        print(str(word)+' '+str(surp)+' '+str(H))
-
-def get_complexity_apply(o, t, sentid, tags=False):
-    ## Use apply() method
-    Hs = torch.squeeze(apply(get_entropy,o))
-    surps = apply(get_surps,o)
-    
-    if args.guess:
-        guesses = apply(get_guesses, o)
-        guessscores = apply(get_guessscores, o)
-    ## Use dimensional indexing method
-    ## NOTE: For some reason, this doesn't work.
-    ##       May marginally speed things if we can determine why
-    ##       Currently 'probs' ends up equivalent to o after the softmax
-    #probs = nn.functional.softmax(o,dim=0)
-    #logprobs = nn.functional.log_softmax(o,dim=0)
-    #Hs = -1 * torch.sum(probs * logprobs),dim=1)
-    #surps = -1 * logprobs
-    ## Move along
-    for corpuspos,targ in enumerate(t):
-        if tags:
-            word = corpus.dictionary.idx2tag[int(targ)]
-        else:
-            word = corpus.dictionary.idx2word[int(targ)]
-        if word == '<eos>' or word == '<EOS>':
-            #don't output the complexity of EOS
-            continue
-        surp = surps[corpuspos][int(targ)]
-        if args.guess:
-            outputguesses = []
-            for g in range(args.guessn):
-                if tags:
-                    outputguesses.append(corpus.dictionary.idx2tag[int(guesses[corpuspos][g])])
-                else:
-                    outputguesses.append(corpus.dictionary.idx2word[int(guesses[corpuspos][g])])
-                if args.guessscores:
-                    ##output raw scores
-                    outputguesses.append("{:.3f}".format(float(guessscores[corpuspos][g])))
-                elif args.guessratios:
-                    ##output scores (ratio of score(x)/score(best guess)
-                    outputguesses.append("{:.3f}".format(float(guessscores[corpuspos][g])/float(guessscores[corpuspos][0])))
-                elif args.guessprobs:
-                  ##output probabilities ## Currently normalizes probs over N-best list; ideally it'd normalize to probs before getting the N-best
-                  outputguesses.append("{:.3f}".format(math.exp(float(nn.functional.log_softmax(guessscores[corpuspos],dim=0)[g]))))
-            outputguesses = ' '.join(outputguesses)
-            print(str(word)+' '+str(sentid)+' '+str(corpuspos)+' '+str(len(word))+' '+str(float(surp))+' '+str(float(Hs[corpuspos]))+' '+str(outputguesses))
-        else:
-            print(str(word)+' '+str(sentid)+' '+str(corpuspos)+' '+str(len(word))+' '+str(float(surp))+' '+str(float(Hs[corpuspos])))
-
-def apply(func, M):
-    ## applies a function along a given dimension
-    tList = [func(m) for m in torch.unbind(M,dim=0) ]
-    res = torch.stack(tList)
-    return res
-
-###############################################################################
-# Training code
-###############################################################################
 
 def repackage_hidden(h):
     """Wraps hidden states in new Variables, to detach them from their history."""
@@ -164,17 +21,18 @@ def repackage_hidden(h):
     else:
         return tuple(repackage_hidden(v) for v in h)
     
-def get_batch(lm_data, tag_data, i, evaluation=False):
+def get_batch(lm_data, lm_masking, tag_data, i, evaluation=False):
     seq_len = min(args.bptt, lm_data.size(0))
     input_token = Variable(lm_data[:seq_len-1, i:(i+args.batch_size)], volatile=evaluation)
     output_token = Variable(lm_data[1:seq_len, i:(i+args.batch_size)])
     input_tag = Variable(tag_data[:seq_len-1, i:(i+args.batch_size)], volatile=evaluation)
     output_tag = Variable(tag_data[1:seq_len, i:(i+args.batch_size)])
+    masking = Variable(lm_masking[:seq_len, i:(i+args.batch_size)], volatile=evaluation)
     #This is where data should be CUDA-fied to lessen OOM errors
     if args.cuda:
-        return input_token.cuda(), output_token.cuda(), input_tag.cuda(), output_tag.cuda()
+        return input_token.cuda(), output_token.cuda(), input_tag.cuda(), output_tag.cuda(), masking.cuda()
     else:
-        return input_token, output_token, input_tag, output_tag
+        return input_token, output_token, input_tag, output_tag, masking
 
 def test_get_batch(sent_ids, tag_ids):
     seq_len = sent_ids.size(0)
@@ -191,20 +49,9 @@ def test_get_batch(sent_ids, tag_ids):
 def test_evaluate(args, model, test_lm_sentences, lm_data_source, ccg_data_source):
     # Turn on evaluation mode which disables dropout.
     model.eval()
-    '''
-    if args.words:
-        print('word sentid sentpos wlen surp entropy')#,end='')
-        if args.guess:
-            for i in range(args.guessn):
-                print(' guess'+str(i))#,end='')
-                if args.guessscores:
-                    print(' gscore'+str(i))#,end='')
-        sys.stdout.write('\n')
-    '''
     total_loss = 0.
     bar = Bar('Processing', max=len(lm_data_source))
     for i in range(len(lm_data_source)):
-        sent = test_lm_sentences[i]
         sent_ids = lm_data_source[i]
         tag_ids = ccg_data_source[i]
         if args.cuda:
@@ -233,24 +80,16 @@ def test_evaluate(args, model, test_lm_sentences, lm_data_source, ccg_data_sourc
                 else:
                     p_word, p_tag, hidden_word, hidden_tag = model(input_token, input_tag, hidden_word, hidden_tag)
                 word_loss = criterion(p_word, output_tokens[t])
-                curr_loss += word_loss
+                curr_loss += word_loss[0]
             seq_len = min(sent_ids.size(0), tag_ids.size(0))
             total_loss += float(curr_loss)/seq_len
-            '''
-            if args.words:
-                # output word-level complexity metrics
-                get_complexity_apply(output_flat, output_token, i, tags=True)
-            else:
-                # output sentence-level loss
-                print(str(sent)+":"+str(curr_loss))
-            '''
             hidden_word = repackage_hidden(hidden_word)
             hidden_tag = repackage_hidden(hidden_tag)
         bar.next()
     bar.finish()
     return total_loss / len(lm_data_source)
 
-def evaluate(args, model, valid_lm_data, valid_ccg_data):
+def evaluate(args, model, valid_lm_data, valid_masking, valid_ccg_data):
     # Turn on evaluation mode which disables dropout.
     model.eval()
     total_loss = 0
@@ -260,10 +99,11 @@ def evaluate(args, model, valid_lm_data, valid_ccg_data):
     for i in range(0, valid_lm_data.size(1), args.batch_size):
         if (i+1)*args.batch_size > valid_lm_data.size(1):
             continue
-        input_tokens, output_tokens, input_tags, output_tags = get_batch(valid_lm_data, valid_ccg_data, i)
+        input_tokens, output_tokens, input_tags, output_tags, masking = get_batch(valid_lm_data, valid_masking, 
+                                                                                  valid_ccg_data, i)
         
-        batch_loss = 0
-        for t in range(min(args.bptt-1, train_lm_data.size(0)-1)):
+        seq_loss = 0
+        for t in range(min(args.bptt-1, valid_lm_data.size(0)-1)):
             input_token = input_tokens[t].unsqueeze(0)
             input_tag = input_tags[t].unsqueeze(0)
             if args.rnn_num == 1:
@@ -274,20 +114,25 @@ def evaluate(args, model, valid_lm_data, valid_ccg_data):
                     p_word, p_tag, hidden_word = model(input_token, input_tag, hidden_word) 
             else:
                 p_word, p_tag, hidden_word, hidden_tag = model(input_token, input_tag, hidden_word, hidden_tag)
-            word_loss = criterion(p_word, output_tokens[t])
+            word_loss = criterion(p_word, output_tokens[t]) # [batch_size]
+            word_loss = word_loss * masking[t] 
+            per_word_loss = torch.mean(word_loss)
             if args.lm:
-                batch_loss += word_loss
+                seq_loss += per_word_loss
             else:
                 tag_loss = criterion(p_tag, output_tags[t])
-                batch_loss += word_loss + tag_loss
+                tag_loss = tag_loss * masking[t]
+                per_tag_loss = torch.mean(tag_loss)
+                seq_loss += per_word_loss + per_tag_loss
         
-        total_loss += float(batch_loss)
+        seq_len = min(args.bptt-1, valid_lm_data.size(0)-1)
+        total_loss += float(seq_loss)/seq_len
         
         hidden_word = repackage_hidden(hidden_word)
         hidden_tag = repackage_hidden(hidden_tag)
-    return total_loss / valid_lm_data.size(1)
+    return total_loss
 
-def train(args, model, train_lm_data, train_ccg_data, criterion, optimizer):
+def train(args, model, train_lm_data, train_masking, train_ccg_data, criterion, optimizer):
     # Turn on training mode which enables dropout.
     model.train()
     total_loss = 0
@@ -299,14 +144,15 @@ def train(args, model, train_lm_data, train_ccg_data, criterion, optimizer):
     for batch, i in order:
         if i + args.batch_size >= train_lm_data.size(1):
             continue
-        input_tokens, output_tokens, input_tags, output_tags = get_batch(train_lm_data, train_ccg_data, i)
+        input_tokens, output_tokens, input_tags, output_tags, masking = get_batch(train_lm_data, train_masking, 
+                                                                                  train_ccg_data, i)
             
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
         hidden_word = repackage_hidden(hidden_word)
         hidden_tag = repackage_hidden(hidden_tag)
         optimizer.zero_grad()
-        batch_loss = 0
+        seq_loss = 0
         for t in range(min(args.bptt-1, train_lm_data.size(0)-1)):
             input_token = input_tokens[t].unsqueeze(0)  # [1, batch_size]
             input_tag = input_tags[t].unsqueeze(0)  # [1, batch_size]
@@ -318,27 +164,31 @@ def train(args, model, train_lm_data, train_ccg_data, criterion, optimizer):
                     p_word, p_tag, hidden_word = model(input_token, input_tag, hidden_word)
             else:
                 p_word, p_tag, hidden_word, hidden_tag = model(input_token, input_tag, hidden_word, hidden_tag)
-            word_loss = criterion(p_word, output_tokens[t])
+            word_loss = criterion(p_word, output_tokens[t]) # [batch_size]
+            word_loss = word_loss * masking[t] 
+            per_word_loss = torch.mean(word_loss)
             if args.lm:
-                batch_loss += word_loss
+                seq_loss += per_word_loss
             else:
                 tag_loss = criterion(p_tag, output_tags[t])
-                batch_loss += word_loss + tag_loss
-        batch_loss.backward()
+                tag_loss = tag_loss * masking[t]
+                per_tag_loss = torch.mean(tag_loss)
+                seq_loss += per_word_loss + per_tag_loss
+        seq_loss.backward()
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
         optimizer.step()
 
-        total_loss += float(batch_loss)
+        seq_len = min(args.bptt-1, train_lm_data.size(0)-1)
+        total_loss += float(seq_loss)/seq_len
 
         if batch % args.log_interval == 0 and batch > 0:
             cur_loss = total_loss / args.log_interval
             elapsed = time.time() - start_time
-            print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | {:5.2f} ms/batch | '
-                    'loss {:5.2f} '.format(
-                epoch, batch, train_lm_data.size(1) // args.batch_size, lr,
-                elapsed * 1000 / args.log_interval, cur_loss))
+            print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:1.6f} | {:5.2f} ms/batch | '
+                    'loss {:5.4f} '.format(epoch, batch, train_lm_data.size(1) // args.batch_size, 
+                          lr, elapsed * 1000 / args.log_interval, cur_loss))
             total_loss = 0
             start_time = time.time()
 
@@ -393,7 +243,7 @@ if __name__ == '__main__':
                         help='use CUDA')
     parser.add_argument('--log_interval', type=int, default=125, metavar='N',
                         help='report interval')
-    parser.add_argument('--save', type=str,  default='../models/model.pt',
+    parser.add_argument('--exp', type=str,  default='single',
                         help='path to save the final model')
     parser.add_argument('--test', action='store_true',
                         help='test a trained LM')
@@ -422,6 +272,13 @@ if __name__ == '__main__':
             
     if not os.path.exists('../models'):
         os.mkdir('../models')
+    if not os.path.exists('../logs'):
+        os.mkdir('../logs')
+    
+    eval_log = '../logs/'+args.exp
+    if not os.path.exists(eval_log):
+        os.mkdir(eval_log)
+    summary_writer = tf.summary.FileWriter(eval_log)
             
     # Load data
     word2idx, tag2idx, idx2word, idx2tag = build_dictionary(args.vocab_path, args.tag_path)
@@ -448,7 +305,7 @@ if __name__ == '__main__':
         if args.cuda:
             model.cuda()
     
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(reduction='none')
     lr = args.lr
     best_val_loss = None
     
@@ -476,29 +333,53 @@ if __name__ == '__main__':
                                                  train_fname, valid_fname, None, testflag=args.test)
     
                     train_lm_data = batchify(corpus.train_lm, args.batch_size)
+                    train_masking = batchify(corpus.train_maksing, args.batch_size)
                     train_ccg_data = batchify(corpus.train_tag, args.batch_size)
                     
                     epoch_start_time = time.time()
-                    train(args, model, train_lm_data, train_ccg_data, criterion, optimizer)
-                    
+                    train(args, model, train_lm_data, train_masking, train_ccg_data, criterion, optimizer)
+
                     val_lm_data = batchify(corpus.valid_lm, args.batch_size)
+                    val_masking = batchify(corpus.valid_maksing, args.batch_size)
                     val_ccg_data = batchify(corpus.valid_tag, args.batch_size)
-                    val_loss = evaluate(args, model, val_lm_data, val_ccg_data)
-                    print('-' * 89)
-                    print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} '.format(epoch, 
+                    val_loss = evaluate(args, model, val_lm_data, val_masking, val_ccg_data)
+                    print('-' * 80)
+                    print('| end of %s | time: {:5.2f}s | valid loss {:5.4f} '.format(train_fname, 
                           (time.time() - epoch_start_time), val_loss))
-                    print('-' * 89)
+                    print('-' * 80)
                     # Save the model if the validation loss is the best we've seen so far.
                     if not best_val_loss or val_loss < best_val_loss:
-                        with open(args.save, 'wb') as f:
+                        with open('../models/'+args.exp+'.pt', 'wb') as f:
                             torch.save(model, f)
                             best_val_loss = val_loss
+                
+                total_val_loss = 0
+                for valid_name in valid_files:
+                    corpus = data.SentenceCorpus(args.bptt, args.lm_data, args.tag_data, 
+                                                 word2idx, tag2idx, idx2word, idx2tag,
+                                                 None, valid_fname, None, testflag=args.test)
+                    val_lm_data = batchify(corpus.valid_lm, args.batch_size)
+                    val_masking = batchify(corpus.valid_maksing, args.batch_size)
+                    val_ccg_data = batchify(corpus.valid_tag, args.batch_size)
+                    val_loss = evaluate(args, model, val_lm_data, val_masking, val_ccg_data)
+                    total_val_loss += val_loss
+                total_val_loss /= len(valid_files)
+                print('-' * 80)
+                print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.4f} '.format(epoch, 
+                      (time.time() - epoch_start_time), total_val_loss))
+                print('-' * 80)
+                
+                loss_sum = tf.Summary()
+                loss_sum.value.add(tag='val_loss', simple_value=total_val_loss)
+                summary_writer.add_summary(loss_sum, global_step=iter)
+                summary_writer.flush()
+                
         except KeyboardInterrupt:
-            print('-' * 89)
+            print('-' * 80)
             print('Exiting from training early')
     else:
         # Load the best saved model.
-        with open(args.save, 'rb') as f:
+        with open('../models/'+args.exp+'.pt', 'rb') as f:
             if args.cuda:
                 model = torch.load(f)
             else:
@@ -524,8 +405,8 @@ if __name__ == '__main__':
             # Run on test data.
             curr_loss = test_evaluate(args, model, test_lm_sentences, test_lm_data, test_ccg_data)
             test_loss += curr_loss
-            print('| End of testing | test loss {:5.2f} '.format(curr_loss))
+            print('| End of testing | test loss {:5.4f} '.format(curr_loss))
         test_loss = test_loss / len(test_files)
-        print('=' * 89)
-        print('| End of testing | test loss {:5.2f} | test ppl {:8.2f}'.format(test_loss, np.power(2, test_loss)))
-        print('=' * 89)
+        print('=' * 80)
+        print('| End of testing | test loss {:5.4f} | test ppl {:8.4f}'.format(test_loss, np.power(2, test_loss)))
+        print('=' * 80)

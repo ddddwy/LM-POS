@@ -217,6 +217,8 @@ if __name__ == '__main__':
                         help='use simple model')
     parser.add_argument('--lm', action='store_true',
                         help='use lm model')
+    parser.add_argument('--load', action='store_true',
+                        help='load pre-trained model')
     parser.add_argument('--model', type=str, default='LSTM',
                         help='type of recurrent net (RNN_TANH, RNN_RELU, LSTM, GRU)')
     parser.add_argument('--emsize', type=int, default=100,
@@ -284,7 +286,7 @@ if __name__ == '__main__':
     word2idx, tag2idx, idx2word, idx2tag = build_dictionary(args.vocab_path, args.tag_path)
     
     # Build model
-    if not args.test:
+    if not args.test and not args.load:
         ntokens = len(idx2word)
         ntags = len(idx2tag)
         print('Number of unique words:', ntokens)
@@ -304,6 +306,14 @@ if __name__ == '__main__':
                 model = model.MultiRNNModel(args.model, ntokens, ntags, args.emsize, args.nhid, args.nlayers, args.dropout)
         if args.cuda:
             model.cuda()
+    
+    if args.load:
+        # Load the best saved model.
+        with open('../models/'+args.exp+'.pt', 'rb') as f:
+            if args.cuda:
+                model = torch.load(f)
+            else:
+                model = torch.load(f, map_location='cpu')
     
     criterion = nn.CrossEntropyLoss(reduction='none')
     lr = args.lr

@@ -284,13 +284,13 @@ if __name__ == '__main__':
             
     # Load data
     word2idx, tag2idx, idx2word, idx2tag = build_dictionary(args.vocab_path, args.tag_path)
+    ntokens = len(idx2word)
+    ntags = len(idx2tag)
+    print('Number of unique words:', ntokens)
+    print('Number of unique tags:', ntags)
     
     # Build model
     if not args.test and not args.load:
-        ntokens = len(idx2word)
-        ntags = len(idx2tag)
-        print('Number of unique words:', ntokens)
-        print('Number of unique tags:', ntags)
         print('Build model!!!')
         if args.rnn_num == 1:
             if args.lm:

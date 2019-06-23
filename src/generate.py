@@ -16,6 +16,10 @@ parser.add_argument('--seq_len', type=int, default=35,
                     help='max seqence length')
 parser.add_argument('--rnn_num', type=int, default=1,
                     help='number of recurrent net')
+parser.add_argument('--simple', action='store_true',
+                    help='use simple model')
+parser.add_argument('--lm', action='store_true',
+                    help='use lm model')
 parser.add_argument('--exp', type=str, default='lm',
                     help='model checkpoint to use')
 parser.add_argument('--outf', type=str, default='../results/generated.txt',

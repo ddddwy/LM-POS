@@ -381,7 +381,7 @@ if __name__ == '__main__':
                 
                 loss_sum = tf.Summary()
                 loss_sum.value.add(tag='val_loss', simple_value=total_val_loss)
-                summary_writer.add_summary(loss_sum, global_step=iter)
+                summary_writer.add_summary(loss_sum, global_step=epoch)
                 summary_writer.flush()
                 
         except KeyboardInterrupt:

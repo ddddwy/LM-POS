@@ -357,7 +357,7 @@ if __name__ == '__main__':
                 for valid_name in valid_files:
                     corpus = data.SentenceCorpus(args.bptt, args.lm_data, args.tag_data, 
                                                  word2idx, tag2idx, idx2word, idx2tag,
-                                                 None, valid_fname, None, testflag=args.test)
+                                                 train_fname, valid_fname, None, testflag=args.test)
                     val_lm_data = batchify(corpus.valid_lm, args.batch_size)
                     val_masking = batchify(corpus.valid_maksing, args.batch_size)
                     val_ccg_data = batchify(corpus.valid_tag, args.batch_size)

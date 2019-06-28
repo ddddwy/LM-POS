@@ -358,22 +358,21 @@ if __name__ == '__main__':
                           (time.time() - epoch_start_time), val_loss))
                     print('-' * 80)
                     # Save the model if the validation loss is the best we've seen so far.
-                    if not best_val_loss or val_loss < best_val_loss:
+                    if best_val_loss is None or val_loss < best_val_loss:
                         with open('../models/'+args.exp+'.pt', 'wb') as f:
                             torch.save(model, f)
                             best_val_loss = val_loss
                 
                 total_val_loss = 0
-                for valid_name in valid_files:
-                    corpus = data.SentenceCorpus(args.bptt, args.lm_data, args.tag_data, 
-                                                 word2idx, tag2idx, idx2word, idx2tag,
-                                                 train_fname, valid_fname, None, testflag=args.test)
-                    val_lm_data = batchify(corpus.valid_lm, args.batch_size)
-                    val_masking = batchify(corpus.valid_maksing, args.batch_size)
-                    val_ccg_data = batchify(corpus.valid_tag, args.batch_size)
-                    val_loss = evaluate(args, model, val_lm_data, val_masking, val_ccg_data)
-                    total_val_loss += val_loss
-                total_val_loss /= len(valid_files)
+                valid_name = valid_files[0]
+                corpus = data.SentenceCorpus(args.bptt, args.lm_data, args.tag_data, 
+                                             word2idx, tag2idx, idx2word, idx2tag,
+                                             train_fname, valid_fname, None, testflag=args.test)
+                val_lm_data = batchify(corpus.valid_lm, args.batch_size)
+                val_masking = batchify(corpus.valid_maksing, args.batch_size)
+                val_ccg_data = batchify(corpus.valid_tag, args.batch_size)
+                val_loss = evaluate(args, model, val_lm_data, val_masking, val_ccg_data)
+                total_val_loss += val_loss
                 print('-' * 80)
                 print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.4f} '.format(epoch, 
                       (time.time() - epoch_start_time), total_val_loss))
